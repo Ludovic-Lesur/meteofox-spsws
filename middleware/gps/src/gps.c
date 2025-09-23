@@ -15,6 +15,10 @@
 #include "rtc.h"
 #include "types.h"
 
+/*** GPS local macros ***/
+
+#define GPS_TIMEOUT_SECONDS     10
+
 /*** GPS local structures ***/
 
 /*******************************************************************/
@@ -52,6 +56,7 @@ static GPS_status_t _GPS_perform_acquisition(NEOM8X_gps_data_t gps_data, NEOM8X_
     NEOM8X_acquisition_t gps_acquisition;
     uint32_t uptime = RTC_get_uptime_seconds();
     uint32_t start_time = uptime;
+    uint8_t callback_flag = 0;
     // Reset data.
     gps_ctx.acquisition_status = NEOM8X_ACQUISITION_STATUS_FAIL;
     (*acquisition_duration_seconds) = 0;
@@ -76,12 +81,21 @@ static GPS_status_t _GPS_perform_acquisition(NEOM8X_gps_data_t gps_data, NEOM8X_
         (*acquisition_duration_seconds) = (uptime - start_time);
         // Check flag.
         if (gps_ctx.process_flag != 0) {
+            // Update flags.
+            gps_ctx.process_flag = 0;
+            callback_flag = 1;
             // Process driver.
             neom8x_status = NEOM8X_process();
             NEOM8X_exit_error(GPS_ERROR_BASE_NEOM8N);
         }
         // Check acquisition status.
         if (gps_ctx.acquisition_status == expected_acquisition_status) break;
+        // Exit if process callback has never been called.
+        if ((callback_flag == 0) && (uptime > (start_time + GPS_TIMEOUT_SECONDS))) {
+            status = GPS_ERROR_PROCESS_CALLBACK;
+            goto errors;
+        }
+
     }
     neom8x_status = NEOM8X_stop_acquisition();
     NEOM8X_exit_error(GPS_ERROR_BASE_NEOM8N);
