@@ -126,7 +126,6 @@ typedef union {
         unsigned sen15901_process :1;
 #endif
         unsigned radio_enabled : 1;
-        unsigned daily_geoloc_done : 1;
         unsigned daily_rtc_calibration_done : 1;
         unsigned fixed_hour_alarm :1;
         unsigned wake_up :1;
@@ -233,6 +232,13 @@ typedef union {
 } SPSWS_sigfox_geoloc_timeout_data_t;
 
 /*******************************************************************/
+typedef enum {
+    SPSWS_TIMESTAMP_TYPE_PREVIOUS_WAKE_UP = 0,
+    SPSWS_TIMESTAMP_TYPE_PREVIOUS_GEOLOC,
+    SPSWS_TIMESTAMP_TYPE_PREVIOUS_LAST
+} SPSWS_timestamp_type_t;
+
+/*******************************************************************/
 typedef struct {
     // Global.
     SPSWS_state_t state;
@@ -254,6 +260,8 @@ typedef struct {
     SPSWS_sigfox_weather_data_t sigfox_weather_data;
     SPSWS_sigfox_geoloc_data_t sigfox_geoloc_data;
     SPSWS_sigfox_geoloc_timeout_data_t sigfox_geoloc_timeout_data;
+    // Geoloc.
+    RTC_time_t previous_geoloc_time;
     // Error stack.
     uint8_t sigfox_error_stack_data[SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE];
 #endif
@@ -607,9 +615,20 @@ static void _SPSWS_update_time_flags(void) {
     NVM_stack_error(ERROR_BASE_NVM);
     nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_HOUR, &spsws_ctx.previous_wake_up_time.hours);
     NVM_stack_error(ERROR_BASE_NVM);
+    // Update previous geolocation time.
+    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 0), &nvm_byte);
+    NVM_stack_error(ERROR_BASE_NVM);
+    spsws_ctx.previous_geoloc_time.year = (nvm_byte << 8);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 1), &nvm_byte);
+    NVM_stack_error(ERROR_BASE_NVM);
+    spsws_ctx.previous_geoloc_time.year |= nvm_byte;
+    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_MONTH, &spsws_ctx.previous_geoloc_time.month);
+    NVM_stack_error(ERROR_BASE_NVM);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_DATE, &spsws_ctx.previous_geoloc_time.date);
+    NVM_stack_error(ERROR_BASE_NVM);
     // Check time are different (avoiding false wake-up due to RTC calibration).
     if ((spsws_ctx.current_time.year != spsws_ctx.previous_wake_up_time.year) || (spsws_ctx.current_time.month != spsws_ctx.previous_wake_up_time.month) || (spsws_ctx.current_time.date != spsws_ctx.previous_wake_up_time.date)) {
-        // Day (and thus hour) has changed.
+        // Day and thus hour have changed.
         spsws_ctx.flags.day_changed = 1;
         spsws_ctx.flags.hour_changed = 1;
     }
@@ -634,24 +653,38 @@ static void _SPSWS_update_time_flags(void) {
 
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
-static void _SPSWS_update_pwut(void) {
+static void _SPSWS_update_timestamp(SPSWS_timestamp_type_t timestamp_type) {
     // Local variables.
-    RTC_status_t rtc_status = RTC_SUCCESS;
     NVM_status_t nvm_status = NVM_SUCCESS;
-    // Retrieve current time from RTC.
-    rtc_status = RTC_get_time(&spsws_ctx.current_time);
-    RTC_stack_error(ERROR_BASE_RTC);
-    // Update previous wake-up time.
-    nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_MONTH, spsws_ctx.current_time.month);
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_DATE, spsws_ctx.current_time.date);
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_HOUR, spsws_ctx.current_time.hours);
-    NVM_stack_error(ERROR_BASE_NVM);
+    // Check timestamp type.
+    switch (timestamp_type) {
+    case SPSWS_TIMESTAMP_TYPE_PREVIOUS_WAKE_UP:
+        // Update previous wake-up time.
+        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_MONTH, spsws_ctx.current_time.month);
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_DATE, spsws_ctx.current_time.date);
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_HOUR, spsws_ctx.current_time.hours);
+        NVM_stack_error(ERROR_BASE_NVM);
+        break;
+    case SPSWS_TIMESTAMP_TYPE_PREVIOUS_GEOLOC:
+        // Update previous geoloc time.
+        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_MONTH, spsws_ctx.current_time.month);
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_DATE, spsws_ctx.current_time.date);
+        NVM_stack_error(ERROR_BASE_NVM);
+        break;
+    default:
+        break;
+    }
 }
 #endif
 
@@ -861,14 +894,16 @@ int main(void) {
                 _SPSWS_update_time_flags();
                 // Check hour change flag.
                 if (spsws_ctx.flags.hour_changed != 0) {
+                    // Retrieve current time from RTC.
+                    rtc_status = RTC_get_time(&spsws_ctx.current_time);
+                    RTC_stack_error(ERROR_BASE_RTC);
                     // Valid fixed hour wake-up.
-                    _SPSWS_update_pwut();
+                    _SPSWS_update_timestamp(SPSWS_TIMESTAMP_TYPE_PREVIOUS_WAKE_UP);
                     // Check if day changed.
                     if (spsws_ctx.flags.day_changed != 0) {
                         // Reset daily flags.
                         spsws_ctx.flags.day_changed = 0;
                         spsws_ctx.flags.is_afternoon = 0;
-                        spsws_ctx.flags.daily_geoloc_done = 0;
                         spsws_ctx.flags.daily_rtc_calibration_done = 0;
                     }
                     spsws_ctx.flags.hour_changed = 0;
@@ -1055,7 +1090,11 @@ int main(void) {
                 spsws_ctx.state = SPSWS_STATE_RTC_CALIBRATION;
             }
             else {
-                if ((spsws_ctx.flags.daily_geoloc_done == 0) && (spsws_ctx.flags.is_afternoon != 0)) {
+                if (((spsws_ctx.current_time.year  != spsws_ctx.previous_geoloc_time.year)  ||
+                     (spsws_ctx.current_time.month != spsws_ctx.previous_geoloc_time.month) ||
+                     (spsws_ctx.current_time.date  != spsws_ctx.previous_geoloc_time.date)) &&
+                     (spsws_ctx.flags.is_afternoon != 0))
+                {
                     // Perform device geolocation.
                     spsws_ctx.state = SPSWS_STATE_GEOLOC;
                 }
@@ -1104,8 +1143,8 @@ int main(void) {
             }
             // Send uplink geolocation frame.
             _SPSWS_send_sigfox_message(&application_message);
-            // Update done flag.
-            spsws_ctx.flags.daily_geoloc_done = 1;
+            // Update timestamp.
+            _SPSWS_update_timestamp(SPSWS_TIMESTAMP_TYPE_PREVIOUS_GEOLOC);
             // Send error stack frame.
             spsws_ctx.state = SPSWS_STATE_ERROR_STACK;
             break;
