@@ -107,7 +107,7 @@
  * \def SIGFOX_EP_BIDIRECTIONAL
  * \brief Support bidirectional procedure (downlink) if defined. Only applicable to application messages. Otherwise all messages will be uplink only.
  *******************************************************************/
-#if ((defined HW2_0) && (defined SPSWS_MODE_CLI))
+#ifdef HW2_0
 #define SIGFOX_EP_BIDIRECTIONAL
 #endif
 

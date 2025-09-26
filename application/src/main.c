@@ -38,6 +38,7 @@
 #include "gps.h"
 #include "power.h"
 // Sigfox.
+#include "sigfox_ep_flags.h"
 #include "sigfox_ep_api.h"
 #include "sigfox_rc.h"
 #include "sigfox_types.h"
@@ -124,6 +125,9 @@ typedef union {
         unsigned ultimeter_process :1;
 #endif
         unsigned sen15901_process :1;
+#endif
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+        unsigned reset_request : 1;
 #endif
         unsigned radio_enabled : 1;
         unsigned daily_rtc_calibration_done : 1;
@@ -235,8 +239,20 @@ typedef union {
 typedef enum {
     SPSWS_TIMESTAMP_TYPE_PREVIOUS_WAKE_UP = 0,
     SPSWS_TIMESTAMP_TYPE_PREVIOUS_GEOLOC,
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    SPSWS_TIMESTAMP_TYPE_PREVIOUS_DOWNLINK,
+#endif
     SPSWS_TIMESTAMP_TYPE_PREVIOUS_LAST
 } SPSWS_timestamp_type_t;
+
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+/*******************************************************************/
+typedef enum {
+    SPSWS_DL_OP_CODE_NOP = 0,
+    SPSWS_DL_OP_CODE_RESET,
+    SPSWS_DL_OP_CODE_LAST
+} SPSWS_dl_op_code_t;
+#endif
 
 /*******************************************************************/
 typedef struct {
@@ -260,8 +276,12 @@ typedef struct {
     SPSWS_sigfox_weather_data_t sigfox_weather_data;
     SPSWS_sigfox_geoloc_data_t sigfox_geoloc_data;
     SPSWS_sigfox_geoloc_timeout_data_t sigfox_geoloc_timeout_data;
-    // Geoloc.
+    // Geolocation.
     RTC_time_t previous_geoloc_time;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    // Downlink.
+    RTC_time_t previous_downlink_time;
+#endif
     // Error stack.
     uint8_t sigfox_error_stack_data[SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE];
 #endif
@@ -626,6 +646,19 @@ static void _SPSWS_update_time_flags(void) {
     NVM_stack_error(ERROR_BASE_NVM);
     nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_DATE, &spsws_ctx.previous_geoloc_time.date);
     NVM_stack_error(ERROR_BASE_NVM);
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    // Update previous downlink time.
+    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 0), &nvm_byte);
+    NVM_stack_error(ERROR_BASE_NVM);
+    spsws_ctx.previous_downlink_time.year = (nvm_byte << 8);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 1), &nvm_byte);
+    NVM_stack_error(ERROR_BASE_NVM);
+    spsws_ctx.previous_downlink_time.year |= nvm_byte;
+    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_MONTH, &spsws_ctx.previous_downlink_time.month);
+    NVM_stack_error(ERROR_BASE_NVM);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_DATE, &spsws_ctx.previous_downlink_time.date);
+    NVM_stack_error(ERROR_BASE_NVM);
+#endif
     // Check time are different (avoiding false wake-up due to RTC calibration).
     if ((spsws_ctx.current_time.year != spsws_ctx.previous_wake_up_time.year) || (spsws_ctx.current_time.month != spsws_ctx.previous_wake_up_time.month) || (spsws_ctx.current_time.date != spsws_ctx.previous_wake_up_time.date)) {
         // Day and thus hour have changed.
@@ -682,6 +715,19 @@ static void _SPSWS_update_timestamp(SPSWS_timestamp_type_t timestamp_type) {
         nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_DATE, spsws_ctx.current_time.date);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    case SPSWS_TIMESTAMP_TYPE_PREVIOUS_DOWNLINK:
+        // Update previous geoloc time.
+        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_MONTH, spsws_ctx.current_time.month);
+        NVM_stack_error(ERROR_BASE_NVM);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_DATE, spsws_ctx.current_time.date);
+        NVM_stack_error(ERROR_BASE_NVM);
+        break;
+#endif
     default:
         break;
     }
@@ -694,6 +740,11 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     // Local variables.
     SIGFOX_EP_API_status_t sigfox_ep_api_status = SIGFOX_EP_API_SUCCESS;
     SIGFOX_EP_API_config_t lib_config;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    SIGFOX_EP_API_message_status_t message_status;
+    uint8_t dl_payload[SIGFOX_DL_PAYLOAD_SIZE_BYTES] = { 0x00 };
+    int16_t dl_rssi = 0;
+#endif
     // Directly exit of the radio is disabled due to low supercap voltage.
     if (spsws_ctx.flags.radio_enabled == 0) goto errors;
     // Library configuration.
@@ -704,6 +755,40 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     // Send message.
     sigfox_ep_api_status = SIGFOX_EP_API_send_application_message(application_message);
     SIGFOX_EP_API_stack_error();
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    // Check bidirectional flag.
+    if ((application_message->bidirectional_flag) == SIGFOX_TRUE) {
+        // Reset status.
+        spsws_ctx.status.daily_downlink = 0;
+        // Read message status.
+        message_status = SIGFOX_EP_API_get_message_status();
+        // Check if downlink data is available.
+        if (message_status.field.dl_frame != 0) {
+            // Update status.
+            spsws_ctx.status.daily_downlink = 1;
+            // Read downlink payload.
+            sigfox_ep_api_status = SIGFOX_EP_API_get_dl_payload(dl_payload, SIGFOX_DL_PAYLOAD_SIZE_BYTES, &dl_rssi);
+            SIGFOX_EP_API_stack_error();
+            if (sigfox_ep_api_status == SIGFOX_EP_API_SUCCESS) {
+                // Parse payload.
+                switch (dl_payload[0]) {
+                case SPSWS_DL_OP_CODE_NOP:
+                    // Nothing to do.
+                    break;
+                case SPSWS_DL_OP_CODE_RESET:
+                    // Set reset request.
+                    spsws_ctx.flags.reset_request = 1;
+                    break;
+                default:
+                    ERROR_stack_add(ERROR_DL_OP_CODE);
+                    break;
+                }
+            }
+        }
+        // Update timestamp.
+        _SPSWS_update_timestamp(SPSWS_TIMESTAMP_TYPE_PREVIOUS_DOWNLINK);
+    }
+#endif
     // Close library.
     sigfox_ep_api_status = SIGFOX_EP_API_close();
     SIGFOX_EP_API_stack_error();
@@ -851,11 +936,11 @@ int main(void) {
     application_message.common_parameters.number_of_frames = 3;
     application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
     application_message.type = SIGFOX_APPLICATION_MESSAGE_TYPE_BYTE_ARRAY;
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-    application_message.bidirectional_flag = 0;
-#endif
     application_message.ul_payload = SIGFOX_NULL;
     application_message.ul_payload_size_bytes = 0;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    application_message.bidirectional_flag = SIGFOX_FALSE;
+#endif
     // Main loop.
     while (1) {
         // Reload watchdog.
@@ -881,6 +966,9 @@ int main(void) {
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
             application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_startup_data.frame);
             application_message.ul_payload_size_bytes = SPSWS_SIGFOX_STARTUP_DATA_SIZE;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            application_message.bidirectional_flag = SIGFOX_FALSE;
+#endif
             _SPSWS_send_sigfox_message(&application_message);
             // Perform first RTC calibration.
             spsws_ctx.state = SPSWS_STATE_RTC_CALIBRATION;
@@ -1067,6 +1155,9 @@ int main(void) {
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
             application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_monitoring_data.frame);
             application_message.ul_payload_size_bytes = SPSWS_SIGFOX_MONITORING_DATA_SIZE;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            application_message.bidirectional_flag = SIGFOX_FALSE;
+#endif
             _SPSWS_send_sigfox_message(&application_message);
             // Compute next state.
             spsws_ctx.state = SPSWS_STATE_WEATHER_DATA;
@@ -1080,6 +1171,20 @@ int main(void) {
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
             application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_weather_data.frame);
             application_message.ul_payload_size_bytes = SPSWS_SIGFOX_WEATHER_DATA_SIZE;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            if (((spsws_ctx.current_time.year  != spsws_ctx.previous_downlink_time.year)  ||
+                 (spsws_ctx.current_time.month != spsws_ctx.previous_downlink_time.month) ||
+                 (spsws_ctx.current_time.date  != spsws_ctx.previous_downlink_time.date)) &&
+                 (spsws_ctx.flags.is_afternoon != 0))
+            {
+                // Perform downlink transaction.
+                application_message.bidirectional_flag = SIGFOX_TRUE;
+            }
+            else {
+                // Perform uplink only transaction.
+                application_message.bidirectional_flag = SIGFOX_FALSE;
+            }
+#endif
             _SPSWS_send_sigfox_message(&application_message);
 #ifdef SPSWS_SEN15901_EMULATOR
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 0);
@@ -1141,6 +1246,9 @@ int main(void) {
                 application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_geoloc_timeout_data.frame);
                 application_message.ul_payload_size_bytes = SPSWS_SIGFOX_GEOLOC_TIMEOUT_DATA_SIZE;
             }
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            application_message.bidirectional_flag = SIGFOX_FALSE;
+#endif
             // Send uplink geolocation frame.
             _SPSWS_send_sigfox_message(&application_message);
             // Update timestamp.
@@ -1163,6 +1271,9 @@ int main(void) {
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
                 application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_error_stack_data);
                 application_message.ul_payload_size_bytes = SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+                application_message.bidirectional_flag = SIGFOX_FALSE;
+#endif
                 _SPSWS_send_sigfox_message(&application_message);
                 // Reset error stack.
                 ERROR_stack_init();
@@ -1188,6 +1299,12 @@ int main(void) {
             spsws_ctx.state = SPSWS_STATE_SLEEP;
             break;
         case SPSWS_STATE_SLEEP:
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            // Check reset request.
+            if (spsws_ctx.flags.reset_request != 0) {
+                PWR_software_reset();
+            }
+#endif
             // Enter sleep mode.
             IWDG_reload();
 #ifndef SPSWS_MODE_DEBUG
