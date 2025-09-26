@@ -622,41 +622,41 @@ static void _SPSWS_update_time_flags(void) {
     // Retrieve current time from RTC.
     rtc_status = RTC_get_time(&spsws_ctx.current_time);
     RTC_stack_error(ERROR_BASE_RTC);
-    // Retrieve previous wake-up time from NVM.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 0), &nvm_byte);
+    // Retrieve last wake-up time from NVM.
+    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 0), &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.previous_wake_up_time.year = (nvm_byte << 8);
-    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 1), &nvm_byte);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 1), &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.previous_wake_up_time.year |= nvm_byte;
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_MONTH, &spsws_ctx.previous_wake_up_time.month);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_MONTH, &spsws_ctx.previous_wake_up_time.month);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_DATE, &spsws_ctx.previous_wake_up_time.date);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_DATE, &spsws_ctx.previous_wake_up_time.date);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_HOUR, &spsws_ctx.previous_wake_up_time.hours);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_HOUR, &spsws_ctx.previous_wake_up_time.hours);
     NVM_stack_error(ERROR_BASE_NVM);
     // Update previous geolocation time.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 0), &nvm_byte);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 0), &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.previous_geoloc_time.year = (nvm_byte << 8);
-    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 1), &nvm_byte);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 1), &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.previous_geoloc_time.year |= nvm_byte;
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_MONTH, &spsws_ctx.previous_geoloc_time.month);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_GEOLOC_MONTH, &spsws_ctx.previous_geoloc_time.month);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_DATE, &spsws_ctx.previous_geoloc_time.date);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_GEOLOC_DATE, &spsws_ctx.previous_geoloc_time.date);
     NVM_stack_error(ERROR_BASE_NVM);
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     // Update previous downlink time.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 0), &nvm_byte);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 0), &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.previous_downlink_time.year = (nvm_byte << 8);
-    nvm_status = NVM_read_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 1), &nvm_byte);
+    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 1), &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.previous_downlink_time.year |= nvm_byte;
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_MONTH, &spsws_ctx.previous_downlink_time.month);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_DOWNLINK_MONTH, &spsws_ctx.previous_downlink_time.month);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_DATE, &spsws_ctx.previous_downlink_time.date);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_DOWNLINK_DATE, &spsws_ctx.previous_downlink_time.date);
     NVM_stack_error(ERROR_BASE_NVM);
 #endif
     // Check time are different (avoiding false wake-up due to RTC calibration).
@@ -692,39 +692,39 @@ static void _SPSWS_update_timestamp(SPSWS_timestamp_type_t timestamp_type) {
     // Check timestamp type.
     switch (timestamp_type) {
     case SPSWS_TIMESTAMP_TYPE_PREVIOUS_WAKE_UP:
-        // Update previous wake-up time.
-        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
+        // Update last wake-up time.
+        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_WAKE_UP_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
+        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_MONTH, spsws_ctx.current_time.month);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_MONTH, spsws_ctx.current_time.month);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_DATE, spsws_ctx.current_time.date);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_DATE, spsws_ctx.current_time.date);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_WAKE_UP_HOUR, spsws_ctx.current_time.hours);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_HOUR, spsws_ctx.current_time.hours);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
     case SPSWS_TIMESTAMP_TYPE_PREVIOUS_GEOLOC:
         // Update previous geoloc time.
-        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
+        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_GEOLOC_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
+        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_MONTH, spsws_ctx.current_time.month);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_GEOLOC_MONTH, spsws_ctx.current_time.month);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_GEOLOC_DATE, spsws_ctx.current_time.date);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_GEOLOC_DATE, spsws_ctx.current_time.date);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     case SPSWS_TIMESTAMP_TYPE_PREVIOUS_DOWNLINK:
         // Update previous geoloc time.
-        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
+        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 0), (uint8_t) (spsws_ctx.current_time.year >> 8));
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte((NVM_ADDRESS_PREVIOUS_DOWNLINK_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
+        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 1), (uint8_t) (spsws_ctx.current_time.year >> 0));
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_MONTH, spsws_ctx.current_time.month);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_DOWNLINK_MONTH, spsws_ctx.current_time.month);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_PREVIOUS_DOWNLINK_DATE, spsws_ctx.current_time.date);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_DOWNLINK_DATE, spsws_ctx.current_time.date);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
 #endif
