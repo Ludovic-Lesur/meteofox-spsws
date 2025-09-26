@@ -14,6 +14,7 @@
 #include "error_base.h"
 #include "mcu_mapping.h"
 #include "nvic_priority.h"
+#include "terminal.h"
 #include "types.h"
 #include "usart.h"
 

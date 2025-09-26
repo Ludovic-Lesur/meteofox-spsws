@@ -7,8 +7,13 @@
 
 #include "si1133_hw.h"
 
+#ifndef SI1133_DRIVER_DISABLE_FLAGS_FILE
+#include "si1133_driver_flags.h"
+#endif
 #include "error_base.h"
 #include "sensors_hw.h"
+#include "si1133.h"
+#include "types.h"
 
 #ifndef SI1133_DRIVER_DISABLE
 

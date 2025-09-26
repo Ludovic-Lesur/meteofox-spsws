@@ -7,12 +7,16 @@
 
 #include "sx1232.h"
 
+#ifndef SX1232_DRIVER_DISABLE_FLAGS_FILE
+#include "sx1232_driver_flags.h"
+#endif
 #include "error.h"
 #include "error_base.h"
 #include "gpio.h"
 #include "lptim.h"
 #include "mcu_mapping.h"
 #include "spi.h"
+#include "sx1232.h"
 #include "types.h"
 
 #ifndef SX1232_DRIVER_DISABLE

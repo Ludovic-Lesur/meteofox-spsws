@@ -7,10 +7,14 @@
 
 #include "max111xx.h"
 
+#ifndef MAX111XX_DRIVER_DISABLE_FLAGS_FILE
+#include "max111xx_driver_flags.h"
+#endif
 #include "error.h"
 #include "error_base.h"
 #include "gpio.h"
 #include "lptim.h"
+#include "max111xx.h"
 #include "mcu_mapping.h"
 #include "spi.h"
 #include "types.h"

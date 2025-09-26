@@ -7,8 +7,13 @@
 
 #include "sht3x_hw.h"
 
+#ifndef SHT3X_DRIVER_DISABLE_FLAGS_FILE
+#include "sht3x_driver_flags.h"
+#endif
 #include "error_base.h"
 #include "sensors_hw.h"
+#include "sht3x.h"
+#include "types.h"
 
 #ifndef SHT3X_DRIVER_DISABLE
 

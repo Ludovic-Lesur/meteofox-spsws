@@ -7,12 +7,17 @@
 
 #include "neom8x_hw.h"
 
+#ifndef NEOM8X_DRIVER_DISABLE_FLAGS_FILE
+#include "neom8x_driver_flags.h"
+#endif
 #include "error.h"
 #include "error_base.h"
 #include "lptim.h"
 #include "lpuart.h"
 #include "mcu_mapping.h"
+#include "neom8x.h"
 #include "nvic_priority.h"
+#include "types.h"
 
 #ifndef NEOM8X_DRIVER_DISABLE
 

@@ -7,8 +7,13 @@
 
 #include "dps310_hw.h"
 
+#ifndef DPS310_DRIVER_DISABLE_FLAGS_FILE
+#include "dps310_driver_flags.h"
+#endif
+#include "dps310.h"
 #include "error_base.h"
 #include "sensors_hw.h"
+#include "types.h"
 
 #ifndef DPS310_DRIVER_DISABLE
 

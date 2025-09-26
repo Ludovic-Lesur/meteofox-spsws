@@ -7,6 +7,9 @@
 
 #include "sen15901_hw.h"
 
+#ifndef SEN15901_DRIVER_DISABLE_FLAGS_FILE
+#include "sen15901_driver_flags.h"
+#endif
 #include "analog.h"
 #include "error.h"
 #include "exti.h"
