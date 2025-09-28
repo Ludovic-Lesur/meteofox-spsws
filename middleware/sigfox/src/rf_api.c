@@ -667,7 +667,9 @@ RF_API_status_t RF_API_get_dl_phy_content_and_rssi(sfx_u8* dl_phy_content, sfx_u
         dl_phy_content[idx] = rf_api_ctx.dl_phy_content[idx];
     }
     (*dl_rssi_dbm) = (sfx_s16) rf_api_ctx.dl_rssi_dbm;
+#ifdef SIGFOX_EP_PARAMETERS_CHECK
 errors:
+#endif
     SIGFOX_RETURN();
 }
 #endif
