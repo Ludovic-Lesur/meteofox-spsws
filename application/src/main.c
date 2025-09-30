@@ -104,6 +104,7 @@ typedef enum {
 
 /*******************************************************************/
 typedef union {
+    uint8_t all;
     struct {
         unsigned daily_downlink :1;
         unsigned daily_geoloc :1;
@@ -113,8 +114,7 @@ typedef union {
         unsigned lsi_status :1;
         unsigned mcu_clock_source :1;
         unsigned station_mode :1;
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
-    uint8_t all;
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_status_t;
 
 /*******************************************************************/
@@ -137,7 +137,7 @@ typedef union {
         unsigned day_changed :1;
         unsigned hour_changed :1;
         unsigned por :1;
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
     uint16_t all;
 } SPSWS_flags_t;
 
@@ -174,7 +174,7 @@ typedef union {
         unsigned commit_index :8;
         unsigned commit_id :28;
         unsigned dirty_flag :4;
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_sigfox_startup_data_t;
 
 /*******************************************************************/
@@ -192,7 +192,7 @@ typedef union {
         unsigned wind_direction_average_two_degrees :8;
         unsigned rainfall_mm :8;
 #endif
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_sigfox_weather_data_t;
 
 /*******************************************************************/
@@ -206,7 +206,7 @@ typedef union {
         unsigned vcap_mv :12;
         unsigned vmcu_mv :12;
         unsigned status :8;
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_sigfox_monitoring_data_t;
 
 /*******************************************************************/
@@ -223,7 +223,7 @@ typedef union {
         unsigned longitude_east_flag :1;
         unsigned altitude_meters :16;
         unsigned gps_acquisition_duration_seconds :8;
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_sigfox_geoloc_data_t;
 
 /*******************************************************************/
@@ -232,7 +232,7 @@ typedef union {
     struct {
         unsigned gps_acquisition_status :8;
         unsigned gps_acquisition_duration_seconds :8;
-    } __attribute__((scalar_storage_order("big-endian")))__attribute__((packed));
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_sigfox_geoloc_timeout_data_t;
 
 /*******************************************************************/

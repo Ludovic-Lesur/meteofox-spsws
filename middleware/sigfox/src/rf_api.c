@@ -95,13 +95,15 @@ typedef enum {
 
 /*******************************************************************/
 typedef union {
-    struct {
-        unsigned timer_irq_enable :1;
-        unsigned timer_irq_flag :1;
-        unsigned gpio_irq_enable :1;
-        unsigned gpio_irq_flag :1;
-    } field;
     sfx_u8 all;
+    struct {
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+        unsigned gpio_irq_flag :1;
+        unsigned gpio_irq_enable :1;
+#endif
+        unsigned timer_irq_flag :1;
+        unsigned timer_irq_enable :1;
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } RF_API_flags_t;
 
 /*******************************************************************/
@@ -167,14 +169,14 @@ static RF_API_context_t rf_api_ctx;
 /*******************************************************************/
 static void _RF_API_modulation_timer_irq_callback(void) {
     // Set flag.
-    rf_api_ctx.flags.field.timer_irq_flag = rf_api_ctx.flags.field.timer_irq_enable;
+    rf_api_ctx.flags.timer_irq_flag = rf_api_ctx.flags.timer_irq_enable;
 }
 
 #ifdef SIGFOX_EP_BIDIRECTIONAL
 /*******************************************************************/
 static void _RF_API_sx1232_gpio_irq_callback(void) {
     // Set flag.
-    rf_api_ctx.flags.field.gpio_irq_flag = rf_api_ctx.flags.field.gpio_irq_enable;
+    rf_api_ctx.flags.gpio_irq_flag = rf_api_ctx.flags.gpio_irq_enable;
 }
 #endif
 
@@ -199,7 +201,7 @@ static RF_API_status_t _RF_API_internal_process(void) {
         sx1232_status = SX1232_start_tx();
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         // Enable interrupt.
-        rf_api_ctx.flags.field.timer_irq_enable = 1;
+        rf_api_ctx.flags.timer_irq_enable = 1;
         // Update state.
         rf_api_ctx.state = RF_API_STATE_TX_RAMP_UP;
         break;
@@ -264,7 +266,7 @@ static RF_API_status_t _RF_API_internal_process(void) {
         break;
     case RF_API_STATE_TX_END:
         // Disable interrupt.
-        rf_api_ctx.flags.field.timer_irq_enable = 0;
+        rf_api_ctx.flags.timer_irq_enable = 0;
         // Stop radio.
         SX1232_set_pa_power_value(0x00);
         SX1232_set_mode(SX1232_MODE_STANDBY);
@@ -277,7 +279,7 @@ static RF_API_status_t _RF_API_internal_process(void) {
         sx1232_status = SX1232_start_rx();
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         // Enable interrupt.
-        rf_api_ctx.flags.field.gpio_irq_enable = 1;
+        rf_api_ctx.flags.gpio_irq_enable = 1;
         // Update state.
         rf_api_ctx.state = RF_API_STATE_RX;
         break;
@@ -297,7 +299,7 @@ static RF_API_status_t _RF_API_internal_process(void) {
             sx1232_status = SX1232_read_fifo((sfx_u8*) rf_api_ctx.dl_phy_content, SIGFOX_DL_PHY_CONTENT_SIZE_BYTES);
             SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
             // Disable interrupt.
-            rf_api_ctx.flags.field.gpio_irq_enable = 0;
+            rf_api_ctx.flags.gpio_irq_enable = 0;
             // Update state.
             rf_api_ctx.state = RF_API_STATE_READY;
         }
@@ -576,9 +578,9 @@ RF_API_status_t RF_API_send(RF_API_tx_data_t* tx_data) {
     // Wait for transmission to complete.
     while (rf_api_ctx.state != RF_API_STATE_READY) {
         // Wait for GPIO interrupt.
-        while (rf_api_ctx.flags.field.timer_irq_flag == 0);
+        while (rf_api_ctx.flags.timer_irq_flag == 0);
         // Clear flag.
-        rf_api_ctx.flags.field.timer_irq_flag = 0;
+        rf_api_ctx.flags.timer_irq_flag = 0;
         // Call process function.
         _RF_API_internal_process();
     }
@@ -616,7 +618,7 @@ RF_API_status_t RF_API_receive(RF_API_rx_data_t* rx_data) {
     // Wait for reception to complete.
     while (rf_api_ctx.state != RF_API_STATE_READY) {
         // Wait for GPIO interrupt.
-        while (rf_api_ctx.flags.field.gpio_irq_flag == 0) {
+        while (rf_api_ctx.flags.gpio_irq_flag == 0) {
             // Enter sleep mode.
             PWR_enter_sleep_mode(PWR_SLEEP_MODE_NORMAL);
             IWDG_reload();
@@ -633,7 +635,7 @@ RF_API_status_t RF_API_receive(RF_API_rx_data_t* rx_data) {
             }
         }
         // Clear flag.
-        rf_api_ctx.flags.field.gpio_irq_flag = 0;
+        rf_api_ctx.flags.gpio_irq_flag = 0;
         // Call process function.
         status = _RF_API_internal_process();
         SIGFOX_CHECK_STATUS(RF_API_SUCCESS);
