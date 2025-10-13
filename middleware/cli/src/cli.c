@@ -719,13 +719,23 @@ static AT_status_t _CLI_read_print_dl_payload(void) {
     // Local variables.
     AT_status_t status = AT_SUCCESS;
     SIGFOX_EP_API_status_t sigfox_ep_api_status = SIGFOX_EP_API_SUCCESS;
+    SIGFOX_EP_API_message_status_t message_status;
     sfx_u8 dl_payload[SIGFOX_DL_PAYLOAD_SIZE_BYTES];
     sfx_s16 dl_rssi_dbm = 0;
-    // Read downlink payload.
-    sigfox_ep_api_status = SIGFOX_EP_API_get_dl_payload(dl_payload, SIGFOX_DL_PAYLOAD_SIZE_BYTES, &dl_rssi_dbm);
-    _CLI_check_driver_status(sigfox_ep_api_status, SIGFOX_EP_API_SUCCESS, (ERROR_BASE_SIGFOX_EP_LIB + (SIGFOX_ERROR_SOURCE_SIGFOX_EP_API * ERROR_BASE_STEP)));
-    // Print downlink payload.
-    _CLI_print_dl_payload(dl_payload, SIGFOX_DL_PAYLOAD_SIZE_BYTES, dl_rssi_dbm);
+    // Get message status.
+    message_status = SIGFOX_EP_API_get_message_status();
+    // Check downlink status.
+    if (message_status.field.dl_frame == 0) {
+        AT_reply_add_string("+RX=timeout");
+        AT_send_reply();
+    }
+    else {
+        // Read downlink payload.
+        sigfox_ep_api_status = SIGFOX_EP_API_get_dl_payload(dl_payload, SIGFOX_DL_PAYLOAD_SIZE_BYTES, &dl_rssi_dbm);
+        _CLI_check_driver_status(sigfox_ep_api_status, SIGFOX_EP_API_SUCCESS, (ERROR_BASE_SIGFOX_EP_LIB + (SIGFOX_ERROR_SOURCE_SIGFOX_EP_API * ERROR_BASE_STEP)));
+        // Print downlink payload.
+        _CLI_print_dl_payload(dl_payload, SIGFOX_DL_PAYLOAD_SIZE_BYTES, dl_rssi_dbm);
+    }
 errors:
     return status;
 }
