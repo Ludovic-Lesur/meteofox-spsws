@@ -750,6 +750,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     // Local variables.
     SIGFOX_EP_API_status_t sigfox_ep_api_status = SIGFOX_EP_API_SUCCESS;
     SIGFOX_EP_API_config_t lib_config;
+    uint8_t status = 0;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     SIGFOX_EP_API_message_status_t message_status;
     uint8_t dl_payload[SIGFOX_DL_PAYLOAD_SIZE_BYTES] = { 0x00 };
@@ -761,10 +762,10 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     lib_config.rc = &SIGFOX_RC1;
     // Open library.
     sigfox_ep_api_status = SIGFOX_EP_API_open(&lib_config);
-    SIGFOX_EP_API_stack_error();
+    SIGFOX_EP_API_check_status(0);
     // Send message.
     sigfox_ep_api_status = SIGFOX_EP_API_send_application_message(application_message);
-    SIGFOX_EP_API_stack_error();
+    SIGFOX_EP_API_check_status(0);
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     // Check bidirectional flag.
     if ((application_message->bidirectional_flag) == SIGFOX_TRUE) {
@@ -778,7 +779,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
             spsws_ctx.status.daily_downlink = 1;
             // Read downlink payload.
             sigfox_ep_api_status = SIGFOX_EP_API_get_dl_payload(dl_payload, SIGFOX_DL_PAYLOAD_SIZE_BYTES, &dl_rssi);
-            SIGFOX_EP_API_stack_error();
+            SIGFOX_EP_API_check_status(0);
             if (sigfox_ep_api_status == SIGFOX_EP_API_SUCCESS) {
                 // Parse payload.
                 switch (dl_payload[0]) {
@@ -801,8 +802,11 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
 #endif
     // Close library.
     sigfox_ep_api_status = SIGFOX_EP_API_close();
-    SIGFOX_EP_API_stack_error();
+    SIGFOX_EP_API_check_status(0);
+    return;
 errors:
+    SIGFOX_EP_API_close();
+    UNUSED(status);
     return;
 }
 #endif
