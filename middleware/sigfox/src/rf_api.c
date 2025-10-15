@@ -155,7 +155,7 @@ static sfx_u32 RF_API_LATENCY_MS[RF_API_LATENCY_LAST] = {
     0, // TX de-init (215us).
     0, // Sleep.
 #ifdef SIGFOX_EP_BIDIRECTIONAL
-    (POWER_ON_DELAY_MS_RADIO + SX1232_OSCILLATOR_DELAY_MS + 2), // RX init (power on delay + 1.06ms).
+    (POWER_ON_DELAY_MS_RADIO + SX1232_OSCILLATOR_DELAY_MS + SX1232_IMAGE_CALIBRATION_DELAY_MS + 2), // RX init (power on delay + calibration + 1.06ms).
     SX1232_START_RX_DELAY_MS, // Receive start.
     10, // Receive stop (10ms).
     0, // RX de-init (215us).
@@ -489,15 +489,16 @@ RF_API_status_t RF_API_init(RF_API_radio_parameters_t* radio_parameters) {
         // Specific downlink settings.
         sx1232_status = SX1232_set_rx_bandwidth(SX1232_RXBW_MANTISSA_24, SX1232_RXBW_EXPONENT_7);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
-        sx1232_status = SX1232_set_lna_configuration(SX1232_LNA_MODE_BOOST, SX1232_LNA_GAIN_ATTENUATION_0DB, 0);
-        SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
-        sx1232_status = SX1232_set_rssi_sampling(SX1232_RSSI_SAMPLING_256);
+        sx1232_status = SX1232_set_lna_configuration(SX1232_LNA_MODE_BOOST, SX1232_LNA_GAIN_ATTENUATION_0DB, 1);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         sx1232_status = SX1232_set_preamble_detector(1, 0);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         sx1232_status = SX1232_set_sync_word((sfx_u8*) RF_API_DL_FT, SIGFOX_DL_FT_SIZE_BYTES);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         sx1232_status = SX1232_set_data_size(SIGFOX_DL_PHY_CONTENT_SIZE_BYTES);
+        SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
+        // Image calibration.
+        sx1232_status = SX1232_calibrate_image();
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         // Init DIO0 to detect payload ready interrupt.
         sx1232_status = SX1232_set_dio_mapping(SX1232_DIO0, SX1232_DIO_MAPPING0);
