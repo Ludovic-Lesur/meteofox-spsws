@@ -35,12 +35,10 @@
 #include "power.h"
 #include "rfe.h"
 // Sigfox.
-#ifndef SIGFOX_EP_DISABLE_FLAGS_FILE
-#include "sigfox_ep_flags.h"
-#endif
 #include "manuf/rf_api.h"
 #include "sigfox_ep_addon_rfp_api.h"
 #include "sigfox_ep_api.h"
+#include "sigfox_ep_flags.h"
 #include "sigfox_error.h"
 #include "sigfox_rc.h"
 #include "sigfox_types.h"
@@ -53,18 +51,8 @@
 
 /*** CLI local macros ***/
 
-// Parsing.
 #define CLI_CHAR_SEPARATOR          STRING_CHAR_COMMA
-// Duration of RSSI command.
 #define CLI_RSSI_REPORT_PERIOD_MS   500
-// Enabled commands.
-#define CLI_COMMAND_NVM
-#define CLI_COMMAND_SENSORS
-#define CLI_COMMAND_GPS
-#define CLI_COMMAND_SIGFOX_EP_LIB
-#define CLI_COMMAND_SIGFOX_EP_ADDON_RFP
-#define CLI_COMMAND_CW
-#define CLI_COMMAND_RSSI
 
 /*** CLI local structures ***/
 
@@ -76,18 +64,12 @@ typedef struct {
 
 /*** CLI local functions declaration ***/
 
-/*******************************************************************/
 static AT_status_t _CLI_z_callback(void);
 static AT_status_t _CLI_rcc_callback(void);
-/*******************************************************************/
-#ifdef CLI_COMMAND_NVM
 static AT_status_t _CLI_get_ep_id_callback(void);
 static AT_status_t _CLI_set_ep_id_callback(void);
 static AT_status_t _CLI_get_ep_key_callback(void);
 static AT_status_t _CLI_set_ep_key_callback(void);
-#endif
-/*******************************************************************/
-#ifdef CLI_COMMAND_SENSORS
 static AT_status_t _CLI_adc_callback(void);
 static AT_status_t _CLI_iths_callback(void);
 #ifdef HW2_0
@@ -95,29 +77,16 @@ static AT_status_t _CLI_eths_callback(void);
 #endif
 static AT_status_t _CLI_epts_callback(void);
 static AT_status_t _CLI_euvs_callback(void);
-#endif
-/*******************************************************************/
-#ifdef CLI_COMMAND_GPS
 static AT_status_t _CLI_time_callback(void);
 static AT_status_t _CLI_gps_callback(void);
-#endif
-/*******************************************************************/
-#ifdef CLI_COMMAND_SIGFOX_EP_LIB
 #ifdef SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE
 static AT_status_t _CLI_so_callback(void);
 #endif
 static AT_status_t _CLI_sb_callback(void);
 static AT_status_t _CLI_sf_callback(void);
-#endif
-/*******************************************************************/
-#ifdef CLI_COMMAND_SIGFOX_EP_ADDON_RFP
 static AT_status_t _CLI_tm_callback(void);
-#endif
-/*******************************************************************/
-#ifdef CLI_COMMAND_CW
 static AT_status_t _CLI_cw_callback(void);
-#endif
-#if (defined CLI_COMMAND_RSSI) && (defined SIGFOX_EP_BIDIRECTIONAL)
+#ifdef SIGFOX_EP_BIDIRECTIONAL
 static AT_status_t _CLI_rssi_callback(void);
 #endif
 
@@ -136,7 +105,6 @@ static const AT_command_t CLI_COMMANDS_LIST[] = {
         .description = "Get clocks frequency",
         .callback = &_CLI_rcc_callback
     },
-#ifdef CLI_COMMAND_NVM
     {
         .syntax = "$ID?",
         .parameters = NULL,
@@ -161,8 +129,6 @@ static const AT_command_t CLI_COMMANDS_LIST[] = {
         .description = "Set Sigfox EP key",
         .callback = &_CLI_set_ep_key_callback
     },
-#endif
-#ifdef CLI_COMMAND_SENSORS
     {
         .syntax = "$ADC?",
         .parameters = NULL,
@@ -195,8 +161,6 @@ static const AT_command_t CLI_COMMANDS_LIST[] = {
         .description = "Read UV index",
         .callback = &_CLI_euvs_callback
     },
-#endif
-#ifdef CLI_COMMAND_GPS
     {
         .syntax = "$TIME=",
         .parameters = "<timeout[s]>",
@@ -209,8 +173,6 @@ static const AT_command_t CLI_COMMANDS_LIST[] = {
         .description = "Get GPS position",
         .callback = &_CLI_gps_callback
     },
-#endif
-#ifdef CLI_COMMAND_SIGFOX_EP_LIB
 #ifdef SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE
     {
         .syntax = "$SO",
@@ -231,24 +193,19 @@ static const AT_command_t CLI_COMMANDS_LIST[] = {
         .description = "Sigfox send frame",
         .callback = &_CLI_sf_callback
     },
-#endif
-#ifdef CLI_COMMAND_SIGFOX_EP_ADDON_RFP
     {
         .syntax = "$TM=",
         .parameters = "<bit_rate_index[dec]>,<test_mode_reference[dec]>",
         .description = "Sigfox RFP test mode",
         .callback = _CLI_tm_callback
     },
-#endif
-#ifdef CLI_COMMAND_CW
     {
         .syntax = "$CW=",
         .parameters = "<frequency[hz]>,<enable[bit]>,(<output_power[dbm]>)",
         .description = "Continuous wave",
         .callback = &_CLI_cw_callback
     },
-#endif
-#if (defined CLI_COMMAND_RSSI) && (defined SIGFOX_EP_BIDIRECTIONAL)
+#ifdef SIGFOX_EP_BIDIRECTIONAL
     {
         .syntax = "$RSSI=",
         .parameters = "<frequency[hz]>,<duration[s]>",
@@ -326,7 +283,6 @@ errors:
     return status;
 }
 
-#ifdef CLI_COMMAND_NVM
 /*******************************************************************/
 static AT_status_t _CLI_get_ep_id_callback(void) {
     // Local variables.
@@ -344,9 +300,7 @@ static AT_status_t _CLI_get_ep_id_callback(void) {
 errors:
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_NVM
 /*******************************************************************/
 static AT_status_t _CLI_set_ep_id_callback(void) {
     // Local variables.
@@ -367,9 +321,7 @@ static AT_status_t _CLI_set_ep_id_callback(void) {
 errors:
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_NVM
 /*******************************************************************/
 static AT_status_t _CLI_get_ep_key_callback(void) {
     // Local variables.
@@ -387,9 +339,7 @@ static AT_status_t _CLI_get_ep_key_callback(void) {
 errors:
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_NVM
 /*******************************************************************/
 static AT_status_t _CLI_set_ep_key_callback(void) {
     // Local variables.
@@ -410,9 +360,7 @@ static AT_status_t _CLI_set_ep_key_callback(void) {
 errors:
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_SENSORS
 /*******************************************************************/
 static AT_status_t _CLI_adc_callback(void) {
     // Local variables.
@@ -460,9 +408,7 @@ errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_ANALOG);
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_SENSORS
 /*******************************************************************/
 static AT_status_t _CLI_iths_callback(void) {
     // Local variables.
@@ -490,9 +436,8 @@ errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
 }
-#endif
 
-#if (defined CLI_COMMAND_SENSORS) && (defined HW2_0)
+#ifdef HW2_0
 /*******************************************************************/
 static AT_status_t _CLI_eths_callback(void) {
     // Local variables.
@@ -522,7 +467,6 @@ errors:
 }
 #endif
 
-#ifdef CLI_COMMAND_SENSORS
 /*******************************************************************/
 static AT_status_t _CLI_epts_callback(void) {
     // Local variables.
@@ -550,9 +494,7 @@ errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_SENSORS
 /*******************************************************************/
 static AT_status_t _CLI_euvs_callback(void) {
     // Local variables.
@@ -572,9 +514,7 @@ errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_GPS
 /*******************************************************************/
 static AT_status_t _CLI_time_callback(void) {
     // Local variables.
@@ -639,9 +579,7 @@ errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_GPS);
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_GPS
 /*******************************************************************/
 static AT_status_t _CLI_gps_callback(void) {
     // Local variables.
@@ -694,9 +632,8 @@ errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_GPS);
     return status;
 }
-#endif
 
-#if (((defined CLI_COMMAND_SIGFOX_EP_LIB) || (defined CLI_COMMAND_SIGFOX_EP_ADDON_RFP)) && (defined SIGFOX_EP_BIDIRECTIONAL))
+#ifdef SIGFOX_EP_BIDIRECTIONAL
 /*******************************************************************/
 static void _CLI_print_dl_payload(sfx_u8* dl_payload, sfx_u8 dl_payload_size, sfx_s16 rssi_dbm) {
     // Local variables.
@@ -713,7 +650,7 @@ static void _CLI_print_dl_payload(sfx_u8* dl_payload, sfx_u8 dl_payload_size, sf
 }
 #endif
 
-#if (defined CLI_COMMAND_SIGFOX_EP_LIB) && (defined SIGFOX_EP_BIDIRECTIONAL)
+#ifdef SIGFOX_EP_BIDIRECTIONAL
 /*******************************************************************/
 static AT_status_t _CLI_read_print_dl_payload(void) {
     // Local variables.
@@ -741,7 +678,7 @@ errors:
 }
 #endif
 
-#if (defined CLI_COMMAND_SIGFOX_EP_LIB) && (defined SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE)
+#ifdef SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE
 /*******************************************************************/
 static AT_status_t _CLI_so_callback(void) {
     // Local variables.
@@ -772,7 +709,6 @@ end:
 }
 #endif
 
-#ifdef CLI_COMMAND_SIGFOX_EP_LIB
 /*******************************************************************/
 static AT_status_t _CLI_sb_callback(void) {
     // Local variables.
@@ -834,9 +770,7 @@ errors:
 end:
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_SIGFOX_EP_LIB
 /*******************************************************************/
 static AT_status_t _CLI_sf_callback(void) {
     // Local variables.
@@ -902,9 +836,7 @@ errors:
 end:
     return status;
 }
-#endif
 
-#if (defined CLI_COMMAND_SIGFOX_EP_ADDON_RFP)
 /*******************************************************************/
 static AT_status_t _CLI_tm_callback(void) {
     // Local variables.
@@ -944,9 +876,7 @@ errors:
 end:
     return status;
 }
-#endif
 
-#ifdef CLI_COMMAND_CW
 /*******************************************************************/
 static AT_status_t _CLI_cw_callback(void) {
     // Local variables.
@@ -1008,9 +938,8 @@ errors:
 end:
     return status;
 }
-#endif
 
-#if (defined CLI_COMMAND_RSSI) && (defined SIGFOX_EP_BIDIRECTIONAL)
+#ifdef SIGFOX_EP_BIDIRECTIONAL
 /*******************************************************************/
 static AT_status_t _CLI_rssi_callback(void) {
     // Local variables.

@@ -99,7 +99,7 @@
  * \def SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE
  * \brief Support uplink control keep alive message if defined.
  *******************************************************************/
-#if ((defined HW2_0) && (defined SPSWS_MODE_CLI))
+#ifdef SPSWS_MODE_CLI
 #define SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE
 #endif
 
