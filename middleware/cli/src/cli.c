@@ -425,8 +425,8 @@ static AT_status_t _CLI_iths_callback(void) {
     _CLI_check_driver_status(sht3x_status, SHT3X_SUCCESS, ERROR_BASE_SHT30_INTERNAL);
     // Read and print data.
     // Temperature.
-    AT_reply_add_string("Tpcb=");
     STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
+    AT_reply_add_string("Tpcb=");
     AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
     AT_send_reply();
@@ -456,8 +456,8 @@ static AT_status_t _CLI_eths_callback(void) {
     _CLI_check_driver_status(sht3x_status, SHT3X_SUCCESS, ERROR_BASE_SHT30_EXTERNAL);
     // Read and print data.
     // Temperature.
-    AT_reply_add_string("Tamb=");
     STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
+    AT_reply_add_string("Tamb=");
     AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
     AT_send_reply();
@@ -492,8 +492,8 @@ static AT_status_t _CLI_epts_callback(void) {
     AT_reply_add_string("Pa");
     AT_send_reply();
     // Temperature.
-    AT_reply_add_string("Tamb=");
     STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
+    AT_reply_add_string("Tamb=");
     AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
     AT_send_reply();
