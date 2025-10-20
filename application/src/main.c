@@ -1121,10 +1121,10 @@ int main(void) {
             // Check status.
             if (sht3x_status == SHT3X_SUCCESS) {
                 // Store temperature and humidity.
-                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.tpcb_degrees), generic_s32_1);
+                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.tpcb_degrees), (generic_s32_1 / 10));
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.hpcb_percent), generic_s32_2);
 #ifdef HW1_0
-                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.tamb_degrees), generic_s32_1);
+                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.tamb_degrees), (generic_s32_1 / 10));
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.hamb_percent), generic_s32_2);
 #endif
             }
@@ -1135,7 +1135,7 @@ int main(void) {
             // Check status.
             if (sht3x_status == SHT3X_SUCCESS) {
                 // Store temperature and humidity.
-                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.tamb_degrees), generic_s32_1);
+                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.tamb_degrees), (generic_s32_1 / 10));
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.hamb_percent), generic_s32_2);
             }
 #endif

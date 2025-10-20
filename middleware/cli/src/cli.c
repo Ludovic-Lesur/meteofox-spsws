@@ -51,8 +51,9 @@
 
 /*** CLI local macros ***/
 
-#define CLI_CHAR_SEPARATOR          STRING_CHAR_COMMA
-#define CLI_RSSI_REPORT_PERIOD_MS   500
+#define CLI_CHAR_SEPARATOR              STRING_CHAR_COMMA
+#define CLI_RSSI_REPORT_PERIOD_MS       500
+#define CLI_TEMPERATURE_STRING_SIZE     5
 
 /*** CLI local structures ***/
 
@@ -414,17 +415,19 @@ static AT_status_t _CLI_iths_callback(void) {
     // Local variables.
     AT_status_t status = AT_SUCCESS;
     SHT3X_status_t sht3x_status = SHT3X_SUCCESS;
-    int32_t temperature_degrees = 0;
+    int32_t temperature_tenth_degrees = 0;
+    char_t temperature_str[CLI_TEMPERATURE_STRING_SIZE] = { STRING_CHAR_NULL };
     int32_t humidity_percent = 0;
     // Turn digital sensors on.
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
     // Perform measurements.
-    sht3x_status = SHT3X_get_temperature_humidity(I2C_ADDRESS_SHT30_INTERNAL, &temperature_degrees, &humidity_percent);
+    sht3x_status = SHT3X_get_temperature_humidity(I2C_ADDRESS_SHT30_INTERNAL, &temperature_tenth_degrees, &humidity_percent);
     _CLI_check_driver_status(sht3x_status, SHT3X_SUCCESS, ERROR_BASE_SHT30_INTERNAL);
     // Read and print data.
     // Temperature.
     AT_reply_add_string("Tpcb=");
-    AT_reply_add_integer(temperature_degrees, STRING_FORMAT_DECIMAL, 0);
+    STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
+    AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
     AT_send_reply();
     // Humidity.
@@ -443,17 +446,19 @@ static AT_status_t _CLI_eths_callback(void) {
     // Local variables.
     AT_status_t status = AT_SUCCESS;
     SHT3X_status_t sht3x_status = SHT3X_SUCCESS;
-    int32_t temperature_degrees = 0;
+    int32_t temperature_tenth_degrees = 0;
+    char_t temperature_str[CLI_TEMPERATURE_STRING_SIZE] = { STRING_CHAR_NULL };
     int32_t humidity_percent = 0;
     // Turn digital sensors on.
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
     // Perform measurements.
-    sht3x_status = SHT3X_get_temperature_humidity(I2C_ADDRESS_SHT30_EXTERNAL, &temperature_degrees, &humidity_percent);
+    sht3x_status = SHT3X_get_temperature_humidity(I2C_ADDRESS_SHT30_EXTERNAL, &temperature_tenth_degrees, &humidity_percent);
     _CLI_check_driver_status(sht3x_status, SHT3X_SUCCESS, ERROR_BASE_SHT30_EXTERNAL);
     // Read and print data.
     // Temperature.
     AT_reply_add_string("Tamb=");
-    AT_reply_add_integer(temperature_degrees, STRING_FORMAT_DECIMAL, 0);
+    STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
+    AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
     AT_send_reply();
     // Humidity.
@@ -473,11 +478,12 @@ static AT_status_t _CLI_epts_callback(void) {
     AT_status_t status = AT_SUCCESS;
     DPS310_status_t dps310_status = DPS310_SUCCESS;
     int32_t pressure_pa = 0;
-    int32_t temperature_degrees = 0;
+    int32_t temperature_tenth_degrees = 0;
+    char_t temperature_str[CLI_TEMPERATURE_STRING_SIZE] = { STRING_CHAR_NULL };
     // Turn digital sensors on.
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
     // Perform measurements.
-    dps310_status = DPS310_get_pressure_temperature(I2C_ADDRESS_DPS310, &pressure_pa, &temperature_degrees);
+    dps310_status = DPS310_get_pressure_temperature(I2C_ADDRESS_DPS310, &pressure_pa, &temperature_tenth_degrees);
     _CLI_check_driver_status(dps310_status, DPS310_SUCCESS, ERROR_BASE_DPS310);
     // Read and print data.
     // Pressure.
@@ -487,7 +493,8 @@ static AT_status_t _CLI_epts_callback(void) {
     AT_send_reply();
     // Temperature.
     AT_reply_add_string("Tamb=");
-    AT_reply_add_integer(temperature_degrees, STRING_FORMAT_DECIMAL, 0);
+    STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
+    AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
     AT_send_reply();
 errors:
