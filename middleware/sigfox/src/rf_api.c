@@ -98,6 +98,9 @@ typedef union {
     sfx_u8 all;
     struct {
 #ifdef SIGFOX_EP_BIDIRECTIONAL
+        unsigned payload_ready :1;
+        unsigned rssi_measured :1;
+        unsigned sync_word :1;
         unsigned gpio_irq_flag :1;
         unsigned gpio_irq_enable :1;
 #endif
@@ -174,9 +177,19 @@ static void _RF_API_modulation_timer_irq_callback(void) {
 
 #ifdef SIGFOX_EP_BIDIRECTIONAL
 /*******************************************************************/
-static void _RF_API_sx1232_gpio_irq_callback(void) {
-    // Set flag.
+static void _RF_API_sx1232_sync_word_irq_callback(void) {
+    // Set flags.
     rf_api_ctx.flags.gpio_irq_flag = rf_api_ctx.flags.gpio_irq_enable;
+    rf_api_ctx.flags.sync_word = rf_api_ctx.flags.gpio_irq_enable;
+}
+#endif
+
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+/*******************************************************************/
+static void _RF_API_sx1232_payload_ready_irq_callback(void) {
+    // Set flags.
+    rf_api_ctx.flags.gpio_irq_flag = rf_api_ctx.flags.gpio_irq_enable;
+    rf_api_ctx.flags.payload_ready = rf_api_ctx.flags.gpio_irq_enable;
 }
 #endif
 
@@ -188,7 +201,6 @@ static RF_API_status_t _RF_API_internal_process(void) {
     sfx_u8 symbol_profile_idx = 0;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     RFE_status_t rfe_status = RFE_SUCCESS;
-    sfx_u8 sx1232_payload_ready_irq = 0;
 #endif
     // Perform state machine.
     switch (rf_api_ctx.state) {
@@ -284,14 +296,16 @@ static RF_API_status_t _RF_API_internal_process(void) {
         rf_api_ctx.state = RF_API_STATE_RX;
         break;
     case RF_API_STATE_RX:
-        // Read payload ready flag.
-        sx1232_status = SX1232_get_irq_flag(SX1232_IRQ_INDEX_PAYLOAD_READY, &sx1232_payload_ready_irq);
-        SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
-        // Check flag.
-        if (sx1232_payload_ready_irq != 0) {
+        // Check synchronization word detection.
+        if ((rf_api_ctx.flags.sync_word != 0) && (rf_api_ctx.flags.rssi_measured == 0)) {
             // Read RSSI.
             rfe_status = RFE_get_rssi(&rf_api_ctx.dl_rssi_dbm);
             RFE_stack_exit_error(ERROR_BASE_RFE, (RF_API_status_t) RF_API_ERROR_DRIVER_RFE);
+            // Update flag.
+            rf_api_ctx.flags.rssi_measured = 1;
+        }
+        // Check payload ready flag.
+        if (rf_api_ctx.flags.payload_ready != 0) {
             // Stop radio.
             sx1232_status = SX1232_set_mode(SX1232_MODE_STANDBY);
             SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
@@ -491,7 +505,7 @@ RF_API_status_t RF_API_init(RF_API_radio_parameters_t* radio_parameters) {
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         sx1232_status = SX1232_set_lna_configuration(SX1232_LNA_MODE_BOOST, SX1232_LNA_GAIN_ATTENUATION_0DB, 1);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
-        sx1232_status = SX1232_set_preamble_detector(1, 0);
+        sx1232_status = SX1232_set_preamble_detector(2, 0);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
         sx1232_status = SX1232_set_sync_word((sfx_u8*) RF_API_DL_FT, SIGFOX_DL_FT_SIZE_BYTES);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
@@ -500,10 +514,16 @@ RF_API_status_t RF_API_init(RF_API_radio_parameters_t* radio_parameters) {
         // Image calibration.
         sx1232_status = SX1232_calibrate_image();
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
+        sx1232_status = SX1232_set_rssi_sampling(SX1232_RSSI_SAMPLING_64);
+        SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
+        // Init DIO2 to detect synchronization word interrupt.
+        sx1232_status = SX1232_set_dio_mapping(SX1232_DIO2, SX1232_DIO_MAPPING3);
+        SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
+        EXTI_configure_gpio(&GPIO_SX1232_DIO2, GPIO_PULL_NONE, EXTI_TRIGGER_RISING_EDGE, &_RF_API_sx1232_sync_word_irq_callback, NVIC_PRIORITY_SIGFOX_DOWNLINK_GPIO);
         // Init DIO0 to detect payload ready interrupt.
         sx1232_status = SX1232_set_dio_mapping(SX1232_DIO0, SX1232_DIO_MAPPING0);
         SX1232_stack_exit_error(ERROR_BASE_SX1232, (RF_API_status_t) RF_API_ERROR_DRIVER_SX1232);
-        EXTI_configure_gpio(&GPIO_SX1232_DIO0, GPIO_PULL_NONE, EXTI_TRIGGER_RISING_EDGE, &_RF_API_sx1232_gpio_irq_callback, NVIC_PRIORITY_SIGFOX_DOWNLINK_GPIO);
+        EXTI_configure_gpio(&GPIO_SX1232_DIO0, GPIO_PULL_NONE, EXTI_TRIGGER_RISING_EDGE, &_RF_API_sx1232_payload_ready_irq_callback, NVIC_PRIORITY_SIGFOX_DOWNLINK_GPIO);
         // Switch to RX.
         rfe_status = RFE_set_path(RFE_PATH_RX_LNA);
         RFE_stack_exit_error(ERROR_BASE_RFE, (RF_API_status_t) RF_API_ERROR_DRIVER_RFE);
@@ -523,12 +543,12 @@ RF_API_status_t RF_API_de_init(void) {
     RF_API_status_t status = RF_API_SUCCESS;
     TIM_status_t tim_status = TIM_SUCCESS;
     RFE_status_t rfe_status = RFE_SUCCESS;
-    // Release DIO2.
-    GPIO_write(&GPIO_SX1232_DIO2, 0);
+    // Release DIOs.
 #ifdef SIGFOX_EP_BIDIRECTIONAL
-    // Release DIO0.
     EXTI_release_gpio(&GPIO_SX1232_DIO0, GPIO_MODE_OUTPUT);
+    EXTI_release_gpio(&GPIO_SX1232_DIO2, GPIO_MODE_OUTPUT);
 #endif
+    GPIO_write(&GPIO_SX1232_DIO2, 0);
     // Release symbol profile timer.
     tim_status = TIM_STD_de_init(TIM_INSTANCE_RF_API);
     // Check status.
@@ -605,7 +625,9 @@ RF_API_status_t RF_API_receive(RF_API_rx_data_t* rx_data) {
         SIGFOX_EXIT_ERROR((RF_API_status_t) RF_API_ERROR_NULL_PARAMETER);
     }
 #endif
-    // Enable GPIO interrupt.
+    // Enable GPIO interrupts.
+    EXTI_clear_gpio_flag(&GPIO_SX1232_DIO2);
+    EXTI_enable_gpio_interrupt(&GPIO_SX1232_DIO2);
     EXTI_clear_gpio_flag(&GPIO_SX1232_DIO0);
     EXTI_enable_gpio_interrupt(&GPIO_SX1232_DIO0);
     // Reset flag.
@@ -613,6 +635,7 @@ RF_API_status_t RF_API_receive(RF_API_rx_data_t* rx_data) {
     // Init state.
     rf_api_ctx.state = RF_API_STATE_RX_START;
     rf_api_ctx.flags.all = 0;
+    rf_api_ctx.dl_rssi_dbm = 0;
     // Trigger RX.
     status = _RF_API_internal_process();
     SIGFOX_CHECK_STATUS(RF_API_SUCCESS);
@@ -644,7 +667,8 @@ RF_API_status_t RF_API_receive(RF_API_rx_data_t* rx_data) {
     // Update status flag.
     (rx_data->data_received) = SIGFOX_TRUE;
 errors:
-    // Disable GPIO interrupt.
+    // Disable GPIO interrupts.
+    EXTI_disable_gpio_interrupt(&GPIO_SX1232_DIO2);
     EXTI_disable_gpio_interrupt(&GPIO_SX1232_DIO0);
     SIGFOX_RETURN();
 }
