@@ -1288,6 +1288,8 @@ int main(void) {
             IWDG_reload();
             PWR_enter_deepsleep_mode(PWR_DEEPSLEEP_MODE_STOP);
             IWDG_reload();
+            // Check wake-up reason.
+            spsws_ctx.state = SPSWS_STATE_TASK_CHECK;
             break;
         default:
             // Enter standby mode.
