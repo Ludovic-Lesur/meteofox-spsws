@@ -39,6 +39,7 @@
 #include "power.h"
 // Sigfox.
 #include "sigfox_ep_flags.h"
+#include "sigfox_ep_frames.h"
 #include "sigfox_ep_api.h"
 #include "sigfox_rc.h"
 #include "sigfox_types.h"
@@ -56,28 +57,6 @@
 // Voltage hysteresis for radio.
 #define SPSWS_RADIO_OFF_VCAP_THRESHOLD_MV           1000
 #define SPSWS_RADIO_ON_VCAP_THRESHOLD_MV            1500
-// Sigfox UL payloads size.
-#define SPSWS_SIGFOX_STARTUP_DATA_SIZE              8
-#define SPSWS_SIGFOX_ERROR_DATA_SIZE                12
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-#define SPSWS_SIGFOX_WEATHER_DATA_SIZE              10
-#else
-#define SPSWS_SIGFOX_WEATHER_DATA_SIZE              6
-#endif
-#define SPSWS_SIGFOX_MONITORING_DATA_SIZE           9
-#define SPSWS_SIGFOX_GEOLOC_DATA_SIZE               11
-#define SPSWS_SIGFOX_GEOLOC_TIMEOUT_DATA_SIZE       2
-#define SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE          12
-// Error values.
-#define SPSWS_ERROR_VALUE_ANALOG_12BITS             0xFFF
-#define SPSWS_ERROR_VALUE_ANALOG_16BITS             0xFFFF
-#define SPSWS_ERROR_VALUE_LIGHT                     0xFF
-#define SPSWS_ERROR_VALUE_TEMPERATURE               0x7F
-#define SPSWS_ERROR_VALUE_HUMIDITY                  0xFF
-#define SPSWS_ERROR_VALUE_UV_INDEX                  0xFF
-#define SPSWS_ERROR_VALUE_PRESSURE                  0xFFFF
-#define SPSWS_ERROR_VALUE_WIND                      0xFF
-#define SPSWS_ERROR_VALUE_RAIN                      0xFF
 // Measurements buffers length.
 #define SPSWS_MEASUREMENT_PERIOD_SECONDS            60
 #define SPSWS_MEASUREMENT_BUFFER_SIZE               (3600 / SPSWS_MEASUREMENT_PERIOD_SECONDS)
@@ -120,15 +99,9 @@ typedef union {
 /*******************************************************************/
 typedef union {
     struct {
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-#ifdef SPSWS_WIND_VANE_ULTIMETER
         unsigned ultimeter_process :1;
-#endif
         unsigned sen15901_process :1;
-#endif
-#ifdef SIGFOX_EP_BIDIRECTIONAL
         unsigned reset_request : 1;
-#endif
         unsigned radio_enabled : 1;
         unsigned daily_rtc_calibration_done : 1;
         unsigned fixed_hour_alarm :1;
@@ -165,94 +138,12 @@ typedef struct {
 } SPSWS_measurements_t;
 
 /*******************************************************************/
-typedef union {
-    uint8_t frame[SPSWS_SIGFOX_STARTUP_DATA_SIZE];
-    struct {
-        unsigned reset_reason :8;
-        unsigned major_version :8;
-        unsigned minor_version :8;
-        unsigned commit_index :8;
-        unsigned commit_id :28;
-        unsigned dirty_flag :4;
-    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
-} SPSWS_sigfox_startup_data_t;
-
-/*******************************************************************/
-typedef union {
-    uint8_t frame[SPSWS_SIGFOX_WEATHER_DATA_SIZE];
-    struct {
-        unsigned tamb_degrees :8;
-        unsigned hamb_percent :8;
-        unsigned light_percent :8;
-        unsigned uv_index :8;
-        unsigned patm_abs_tenth_hpa :16;
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-        unsigned wind_speed_average_kmh :8;
-        unsigned wind_speed_peak_kmh :8;
-        unsigned wind_direction_average_two_degrees :8;
-        unsigned rainfall_mm :8;
-#endif
-    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
-} SPSWS_sigfox_weather_data_t;
-
-/*******************************************************************/
-typedef union {
-    uint8_t frame[SPSWS_SIGFOX_MONITORING_DATA_SIZE];
-    struct {
-        unsigned tmcu_degrees :8;
-        unsigned tpcb_degrees :8;
-        unsigned hpcb_percent :8;
-        unsigned vsrc_mv :16;
-        unsigned vcap_mv :12;
-        unsigned vmcu_mv :12;
-        unsigned status :8;
-    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
-} SPSWS_sigfox_monitoring_data_t;
-
-/*******************************************************************/
-typedef union {
-    uint8_t frame[SPSWS_SIGFOX_GEOLOC_DATA_SIZE];
-    struct {
-        unsigned latitude_degrees :8;
-        unsigned latitude_minutes :6;
-        unsigned latitude_seconds :17;
-        unsigned latitude_north_flag :1;
-        unsigned longitude_degrees :8;
-        unsigned longitude_minutes :6;
-        unsigned longitude_seconds :17;
-        unsigned longitude_east_flag :1;
-        unsigned altitude_meters :16;
-        unsigned gps_acquisition_duration_seconds :8;
-    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
-} SPSWS_sigfox_geoloc_data_t;
-
-/*******************************************************************/
-typedef union {
-    uint8_t frame[SPSWS_SIGFOX_GEOLOC_TIMEOUT_DATA_SIZE];
-    struct {
-        unsigned gps_acquisition_status :8;
-        unsigned gps_acquisition_duration_seconds :8;
-    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
-} SPSWS_sigfox_geoloc_timeout_data_t;
-
-/*******************************************************************/
 typedef enum {
     SPSWS_NVM_DATA_LAST_WAKE_UP = 0,
     SPSWS_NVM_DATA_LAST_GEOLOC,
-#ifdef SIGFOX_EP_BIDIRECTIONAL
     SPSWS_NVM_DATA_LAST_DOWNLINK,
-#endif
     SPSWS_NVM_DATA_LAST
 } SPSWS_nvm_data_t;
-
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-/*******************************************************************/
-typedef enum {
-    SPSWS_DL_OP_CODE_NOP = 0,
-    SPSWS_DL_OP_CODE_RESET,
-    SPSWS_DL_OP_CODE_LAST
-} SPSWS_dl_op_code_t;
-#endif
 
 /*******************************************************************/
 typedef struct {
@@ -271,19 +162,14 @@ typedef struct {
     // Measurements buffers.
     SPSWS_measurements_t measurements;
     // Sigfox frames.
-    SPSWS_sigfox_startup_data_t sigfox_startup_data;
-    SPSWS_sigfox_monitoring_data_t sigfox_monitoring_data;
-    SPSWS_sigfox_weather_data_t sigfox_weather_data;
-    SPSWS_sigfox_geoloc_data_t sigfox_geoloc_data;
-    SPSWS_sigfox_geoloc_timeout_data_t sigfox_geoloc_timeout_data;
+    SPSWS_EP_ul_payload_weather_t sigfox_ep_ul_payload_weather;
+    SIGFOX_EP_ul_payload_monitoring_t sigfox_ep_ul_payload_monitoring;
     // Geolocation.
     RTC_time_t previous_geoloc_time;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     // Downlink.
     RTC_time_t previous_downlink_time;
 #endif
-    // Error stack.
-    uint8_t sigfox_error_stack_data[SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE];
 #endif
 } SPSWS_context_t;
 
@@ -396,7 +282,7 @@ static void _SPSWS_compute_final_measurements(void) {
     int32_t generic_s32_2 = 0;
 #endif
     // Temperature.
-    spsws_ctx.sigfox_weather_data.tamb_degrees = SPSWS_ERROR_VALUE_TEMPERATURE;
+    spsws_ctx.sigfox_ep_ul_payload_weather.tamb_degrees = SIGFOX_EP_ERROR_VALUE_TEMPERATURE;
     sample_count = (spsws_ctx.measurements.tamb_degrees.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.tamb_degrees.sample_count;
     if (sample_count > 0) {
         // Compute single value.
@@ -407,56 +293,56 @@ static void _SPSWS_compute_final_measurements(void) {
             math_status = MATH_integer_to_signed_magnitude(generic_s32_1, (MATH_U8_SIZE_BITS - 1), &generic_u32);
             MATH_stack_error(ERROR_BASE_MATH);
             if (math_status == MATH_SUCCESS) {
-                spsws_ctx.sigfox_weather_data.tamb_degrees = (uint8_t) generic_u32;
+                spsws_ctx.sigfox_ep_ul_payload_weather.tamb_degrees = (uint8_t) generic_u32;
             }
         }
     }
     // Humidity.
-    spsws_ctx.sigfox_weather_data.hamb_percent = SPSWS_ERROR_VALUE_HUMIDITY;
+    spsws_ctx.sigfox_ep_ul_payload_weather.hamb_percent = SIGFOX_EP_ERROR_VALUE_HUMIDITY;
     sample_count = (spsws_ctx.measurements.hamb_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.hamb_percent.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_median_filter(spsws_ctx.measurements.hamb_percent.sample_buffer, sample_count, 0, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_weather_data.hamb_percent = (uint8_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_weather.hamb_percent = (uint8_t) generic_s32_1;
         }
     }
     // Light.
-    spsws_ctx.sigfox_weather_data.light_percent = SPSWS_ERROR_VALUE_LIGHT;
+    spsws_ctx.sigfox_ep_ul_payload_weather.light_percent = SIGFOX_EP_ERROR_VALUE_LIGHT;
     sample_count = (spsws_ctx.measurements.light_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.light_percent.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_median_filter(spsws_ctx.measurements.light_percent.sample_buffer, sample_count, 0, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_weather_data.light_percent = (uint8_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_weather.light_percent = (uint8_t) generic_s32_1;
         }
     }
     // UV index.
-    spsws_ctx.sigfox_weather_data.uv_index = SPSWS_ERROR_VALUE_UV_INDEX;
+    spsws_ctx.sigfox_ep_ul_payload_weather.uv_index = SIGFOX_EP_ERROR_VALUE_UV_INDEX;
     sample_count = (spsws_ctx.measurements.uv_index.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.uv_index.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_max(spsws_ctx.measurements.uv_index.sample_buffer, sample_count, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_weather_data.uv_index = (uint8_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_weather.uv_index = (uint8_t) generic_s32_1;
         }
     }
     // Absolute pressure.
-    spsws_ctx.sigfox_weather_data.patm_abs_tenth_hpa = SPSWS_ERROR_VALUE_PRESSURE;
+    spsws_ctx.sigfox_ep_ul_payload_weather.patm_abs_tenth_hpa = SIGFOX_EP_ERROR_VALUE_PRESSURE;
     sample_count = (spsws_ctx.measurements.patm_abs_pa.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.patm_abs_pa.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_median_filter(spsws_ctx.measurements.patm_abs_pa.sample_buffer, sample_count, 0, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_weather_data.patm_abs_tenth_hpa = (uint16_t) (generic_s32_1 / 10);
+            spsws_ctx.sigfox_ep_ul_payload_weather.patm_abs_tenth_hpa = (uint16_t) (generic_s32_1 / 10);
         }
     }
     // MCU temperature.
-    spsws_ctx.sigfox_monitoring_data.tmcu_degrees = SPSWS_ERROR_VALUE_TEMPERATURE;
+    spsws_ctx.sigfox_ep_ul_payload_monitoring.tmcu_degrees = SIGFOX_EP_ERROR_VALUE_TEMPERATURE;
     sample_count = (spsws_ctx.measurements.tmcu_degrees.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.tmcu_degrees.sample_count;
     if (sample_count > 0) {
         // Compute single value.
@@ -467,12 +353,12 @@ static void _SPSWS_compute_final_measurements(void) {
             math_status = MATH_integer_to_signed_magnitude(generic_s32_1, (MATH_U8_SIZE_BITS - 1), &generic_u32);
             MATH_stack_error(ERROR_BASE_MATH);
             if (math_status == MATH_SUCCESS) {
-                spsws_ctx.sigfox_monitoring_data.tmcu_degrees = (uint8_t) generic_u32;
+                spsws_ctx.sigfox_ep_ul_payload_monitoring.tmcu_degrees = (uint8_t) generic_u32;
             }
         }
     }
     // PCB temperature.
-    spsws_ctx.sigfox_monitoring_data.tpcb_degrees = SPSWS_ERROR_VALUE_TEMPERATURE;
+    spsws_ctx.sigfox_ep_ul_payload_monitoring.tpcb_degrees = SIGFOX_EP_ERROR_VALUE_TEMPERATURE;
     sample_count = (spsws_ctx.measurements.tpcb_degrees.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.tpcb_degrees.sample_count;
     if (sample_count > 0) {
         // Compute single value.
@@ -483,54 +369,54 @@ static void _SPSWS_compute_final_measurements(void) {
             math_status = MATH_integer_to_signed_magnitude(generic_s32_1, (MATH_U8_SIZE_BITS - 1), &generic_u32);
             MATH_stack_error(ERROR_BASE_MATH);
             if (math_status == MATH_SUCCESS) {
-                spsws_ctx.sigfox_monitoring_data.tpcb_degrees = (uint8_t) generic_u32;
+                spsws_ctx.sigfox_ep_ul_payload_monitoring.tpcb_degrees = (uint8_t) generic_u32;
             }
         }
     }
     // PCB humidity.
-    spsws_ctx.sigfox_monitoring_data.hpcb_percent = SPSWS_ERROR_VALUE_HUMIDITY;
+    spsws_ctx.sigfox_ep_ul_payload_monitoring.hpcb_percent = SIGFOX_EP_ERROR_VALUE_HUMIDITY;
     sample_count = (spsws_ctx.measurements.hpcb_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.hpcb_percent.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_median_filter(spsws_ctx.measurements.hpcb_percent.sample_buffer, sample_count, 0, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_monitoring_data.hpcb_percent = (uint8_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_monitoring.hpcb_percent = (uint8_t) generic_s32_1;
         }
     }
     // Solar cell voltage.
-    spsws_ctx.sigfox_monitoring_data.vsrc_mv = SPSWS_ERROR_VALUE_ANALOG_16BITS;
+    spsws_ctx.sigfox_ep_ul_payload_monitoring.vsrc_mv = SIGFOX_EP_ERROR_VALUE_ANALOG_16BITS;
     sample_count = (spsws_ctx.measurements.vsrc_mv.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.vsrc_mv.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_median_filter(spsws_ctx.measurements.vsrc_mv.sample_buffer, sample_count, 0, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_monitoring_data.vsrc_mv = (uint16_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_monitoring.vsrc_mv = (uint16_t) generic_s32_1;
         }
     }
     // Supercap voltage.
-    spsws_ctx.sigfox_monitoring_data.vcap_mv = SPSWS_ERROR_VALUE_ANALOG_12BITS;
+    spsws_ctx.sigfox_ep_ul_payload_monitoring.vcap_mv = SIGFOX_EP_ERROR_VALUE_ANALOG_12BITS;
     sample_count = (spsws_ctx.measurements.vcap_mv.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.vcap_mv.sample_count;
     if (sample_count > 0) {
         // Select last value.
-        spsws_ctx.sigfox_monitoring_data.vcap_mv = spsws_ctx.measurements.vcap_mv.sample_buffer[spsws_ctx.measurements.vcap_mv.last_sample_index];
+        spsws_ctx.sigfox_ep_ul_payload_monitoring.vcap_mv = spsws_ctx.measurements.vcap_mv.sample_buffer[spsws_ctx.measurements.vcap_mv.last_sample_index];
     }
     // MCU voltage.
-    spsws_ctx.sigfox_monitoring_data.vmcu_mv = SPSWS_ERROR_VALUE_ANALOG_12BITS;
+    spsws_ctx.sigfox_ep_ul_payload_monitoring.vmcu_mv = SIGFOX_EP_ERROR_VALUE_ANALOG_12BITS;
     sample_count = (spsws_ctx.measurements.vmcu_mv.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.vmcu_mv.sample_count;
     if (sample_count > 0) {
         // Compute single value.
         math_status = MATH_median_filter(spsws_ctx.measurements.vmcu_mv.sample_buffer, sample_count, 0, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_monitoring_data.vmcu_mv = (uint16_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_monitoring.vmcu_mv = (uint16_t) generic_s32_1;
         }
     }
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
     // Wind speed.
-    spsws_ctx.sigfox_weather_data.wind_speed_average_kmh = SPSWS_ERROR_VALUE_WIND;
-    spsws_ctx.sigfox_weather_data.wind_speed_peak_kmh = SPSWS_ERROR_VALUE_WIND;
+    spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_kmh = SIGFOX_EP_ERROR_VALUE_WIND;
+    spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_kmh = SIGFOX_EP_ERROR_VALUE_WIND;
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ultimeter_status = ULTIMETER_get_wind_speed(&generic_s32_1, &generic_s32_2);
     ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
@@ -542,11 +428,11 @@ static void _SPSWS_compute_final_measurements(void) {
     // Check status.
     if (sen15901_status == SEN15901_SUCCESS) {
 #endif
-        spsws_ctx.sigfox_weather_data.wind_speed_average_kmh = (generic_s32_1 / 1000);
-        spsws_ctx.sigfox_weather_data.wind_speed_peak_kmh = (generic_s32_2 / 1000);
+        spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_kmh = (generic_s32_1 / 1000);
+        spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_kmh = (generic_s32_2 / 1000);
     }
     // Wind direction.
-    spsws_ctx.sigfox_weather_data.wind_direction_average_two_degrees = SPSWS_ERROR_VALUE_WIND;
+    spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_two_degrees = SIGFOX_EP_ERROR_VALUE_WIND;
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ultimeter_status = ULTIMETER_get_wind_direction(&generic_s32_1, &wind_direction_status);
     ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
@@ -558,18 +444,18 @@ static void _SPSWS_compute_final_measurements(void) {
     // Check status.
     if ((sen15901_status == SEN15901_SUCCESS) && (wind_direction_status == SEN15901_WIND_DIRECTION_STATUS_AVAILABLE)) {
 #endif
-        spsws_ctx.sigfox_weather_data.wind_direction_average_two_degrees = (generic_s32_1 >> 1);
+        spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_two_degrees = (generic_s32_1 >> 1);
     }
     // Rainfall.
-    spsws_ctx.sigfox_weather_data.rainfall_mm = SPSWS_ERROR_VALUE_RAIN;
+    spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm = SIGFOX_EP_ERROR_VALUE_RAIN;
     sen15901_status = SEN15901_get_rainfall(&generic_s32_1);
     SEN15901_stack_error(ERROR_BASE_SEN15901);
     // Check status.
     if (sen15901_status == SEN15901_SUCCESS) {
-        spsws_ctx.sigfox_weather_data.rainfall_mm = (generic_s32_1 / 1000);
+        spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm = (generic_s32_1 / 1000);
         // Rounding operation.
-        if ((generic_s32_1 - (spsws_ctx.sigfox_weather_data.rainfall_mm * 1000)) >= 500) {
-            spsws_ctx.sigfox_weather_data.rainfall_mm++;
+        if ((generic_s32_1 - (spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm * 1000)) >= 500) {
+            spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm++;
         }
     }
 #endif
@@ -783,10 +669,10 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
             if (sigfox_ep_api_status == SIGFOX_EP_API_SUCCESS) {
                 // Parse payload.
                 switch (dl_payload[0]) {
-                case SPSWS_DL_OP_CODE_NOP:
+                case SIGFOX_EP_DL_OP_CODE_NOP:
                     // Nothing to do.
                     break;
-                case SPSWS_DL_OP_CODE_RESET:
+                case SIGFOX_EP_DL_OP_CODE_RESET:
                     // Set reset request.
                     spsws_ctx.flags.reset_request = 1;
                     break;
@@ -939,7 +825,11 @@ int main(void) {
     GPS_acquisition_status_t gps_acquisition_status = GPS_ACQUISITION_SUCCESS;
     uint32_t gps_acquisition_duration_seconds = 0;
     SIGFOX_EP_API_application_message_t application_message;
+    SIGFOX_EP_ul_payload_startup_t sigfox_ep_ul_payload_startup;
+    SIGFOX_EP_ul_payload_geoloc_t sigfox_ep_ul_payload_geoloc;
+    SIGFOX_EP_ul_payload_geoloc_timeout_t sigfox_ep_ul_payload_geoloc_timeout;
     ERROR_code_t error_code = 0;
+    uint8_t sigfox_ep_ul_payload_error_stack[SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK];
     int32_t generic_s32_1 = 0;
     int32_t generic_s32_2 = 0;
     uint8_t idx = 0;
@@ -968,18 +858,18 @@ int main(void) {
             // Switch to accurate clock.
             _SPSWS_set_clock(1);
             // Fill reset reason and software version.
-            spsws_ctx.sigfox_startup_data.reset_reason = PWR_get_reset_flags();
-            spsws_ctx.sigfox_startup_data.major_version = GIT_MAJOR_VERSION;
-            spsws_ctx.sigfox_startup_data.minor_version = GIT_MINOR_VERSION;
-            spsws_ctx.sigfox_startup_data.commit_index = GIT_COMMIT_INDEX;
-            spsws_ctx.sigfox_startup_data.commit_id = GIT_COMMIT_ID;
-            spsws_ctx.sigfox_startup_data.dirty_flag = GIT_DIRTY_FLAG;
+            sigfox_ep_ul_payload_startup.reset_reason = PWR_get_reset_flags();
+            sigfox_ep_ul_payload_startup.major_version = GIT_MAJOR_VERSION;
+            sigfox_ep_ul_payload_startup.minor_version = GIT_MINOR_VERSION;
+            sigfox_ep_ul_payload_startup.commit_index = GIT_COMMIT_INDEX;
+            sigfox_ep_ul_payload_startup.commit_id = GIT_COMMIT_ID;
+            sigfox_ep_ul_payload_startup.dirty_flag = GIT_DIRTY_FLAG;
             // Clear reset flags.
             PWR_clear_reset_flags();
             // Send SW version frame.
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
-            application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_startup_data.frame);
-            application_message.ul_payload_size_bytes = SPSWS_SIGFOX_STARTUP_DATA_SIZE;
+            application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_startup.frame);
+            application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_STARTUP;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
             application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
@@ -1164,11 +1054,11 @@ int main(void) {
             _SPSWS_compute_final_measurements();
             _SPSWS_reset_measurements();
             // Read status byte.
-            spsws_ctx.sigfox_monitoring_data.status = spsws_ctx.status.all;
+            spsws_ctx.sigfox_ep_ul_payload_monitoring.status = spsws_ctx.status.all;
             // Send uplink monitoring frame.
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
-            application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_monitoring_data.frame);
-            application_message.ul_payload_size_bytes = SPSWS_SIGFOX_MONITORING_DATA_SIZE;
+            application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_ep_ul_payload_monitoring.frame);
+            application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_MONITORING;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
             application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
@@ -1183,8 +1073,8 @@ int main(void) {
 #endif
             // Send uplink weather frame.
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
-            application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_weather_data.frame);
-            application_message.ul_payload_size_bytes = SPSWS_SIGFOX_WEATHER_DATA_SIZE;
+            application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_ep_ul_payload_weather.frame);
+            application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
             if (((spsws_ctx.current_time.year  != spsws_ctx.previous_downlink_time.year)  ||
                  (spsws_ctx.current_time.month != spsws_ctx.previous_downlink_time.month) ||
@@ -1235,30 +1125,30 @@ int main(void) {
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_GPS);
             // Build Sigfox frame.
             if (gps_acquisition_status == GPS_ACQUISITION_SUCCESS) {
-                spsws_ctx.sigfox_geoloc_data.latitude_degrees = gps_position.lat_degrees;
-                spsws_ctx.sigfox_geoloc_data.latitude_minutes = gps_position.lat_minutes;
-                spsws_ctx.sigfox_geoloc_data.latitude_seconds = gps_position.lat_seconds;
-                spsws_ctx.sigfox_geoloc_data.latitude_north_flag = gps_position.lat_north_flag;
-                spsws_ctx.sigfox_geoloc_data.longitude_degrees = gps_position.long_degrees;
-                spsws_ctx.sigfox_geoloc_data.longitude_minutes = gps_position.long_minutes;
-                spsws_ctx.sigfox_geoloc_data.longitude_seconds = gps_position.long_seconds;
-                spsws_ctx.sigfox_geoloc_data.longitude_east_flag = gps_position.long_east_flag;
-                spsws_ctx.sigfox_geoloc_data.altitude_meters = gps_position.altitude;
-                spsws_ctx.sigfox_geoloc_data.gps_acquisition_duration_seconds = gps_acquisition_duration_seconds;
+                sigfox_ep_ul_payload_geoloc.latitude_degrees = gps_position.lat_degrees;
+                sigfox_ep_ul_payload_geoloc.latitude_minutes = gps_position.lat_minutes;
+                sigfox_ep_ul_payload_geoloc.latitude_seconds = gps_position.lat_seconds;
+                sigfox_ep_ul_payload_geoloc.latitude_north_flag = gps_position.lat_north_flag;
+                sigfox_ep_ul_payload_geoloc.longitude_degrees = gps_position.long_degrees;
+                sigfox_ep_ul_payload_geoloc.longitude_minutes = gps_position.long_minutes;
+                sigfox_ep_ul_payload_geoloc.longitude_seconds = gps_position.long_seconds;
+                sigfox_ep_ul_payload_geoloc.longitude_east_flag = gps_position.long_east_flag;
+                sigfox_ep_ul_payload_geoloc.altitude_meters = gps_position.altitude;
+                sigfox_ep_ul_payload_geoloc.gps_acquisition_duration_seconds = gps_acquisition_duration_seconds;
                 // Update message parameters.
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
-                application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_geoloc_data.frame);
-                application_message.ul_payload_size_bytes = SPSWS_SIGFOX_GEOLOC_DATA_SIZE;
+                application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_geoloc.frame);
+                application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC;
                 // Update status bit.
                 spsws_ctx.status.daily_geoloc = 1;
             }
             else {
-                spsws_ctx.sigfox_geoloc_timeout_data.gps_acquisition_status = gps_acquisition_status;
-                spsws_ctx.sigfox_geoloc_timeout_data.gps_acquisition_duration_seconds = gps_acquisition_duration_seconds;
+                sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_status = gps_acquisition_status;
+                sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_duration_seconds = gps_acquisition_duration_seconds;
                 // Update message parameters.
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
-                application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_geoloc_timeout_data.frame);
-                application_message.ul_payload_size_bytes = SPSWS_SIGFOX_GEOLOC_TIMEOUT_DATA_SIZE;
+                application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_geoloc_timeout.frame);
+                application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC_TIMEOUT;
             }
 #ifdef SIGFOX_EP_BIDIRECTIONAL
             application_message.bidirectional_flag = SIGFOX_FALSE;
@@ -1276,15 +1166,15 @@ int main(void) {
             // Check stack.
             if (ERROR_stack_is_empty() == 0) {
                 // Read error stack.
-                for (idx = 0; idx < (SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE >> 1); idx++) {
+                for (idx = 0; idx < (SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK >> 1); idx++) {
                     error_code = ERROR_stack_read();
-                    spsws_ctx.sigfox_error_stack_data[(idx << 1) + 0] = (uint8_t) ((error_code >> 8) & 0x00FF);
-                    spsws_ctx.sigfox_error_stack_data[(idx << 1) + 1] = (uint8_t) ((error_code >> 0) & 0x00FF);
+                    sigfox_ep_ul_payload_error_stack[(idx << 1) + 0] = (uint8_t) ((error_code >> 8) & 0x00FF);
+                    sigfox_ep_ul_payload_error_stack[(idx << 1) + 1] = (uint8_t) ((error_code >> 0) & 0x00FF);
                 }
                 // Send frame.
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
-                application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_error_stack_data);
-                application_message.ul_payload_size_bytes = SPSWS_SIGFOX_ERROR_STACK_DATA_SIZE;
+                application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_error_stack);
+                application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
                 application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
