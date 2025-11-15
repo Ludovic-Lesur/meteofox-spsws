@@ -72,10 +72,11 @@ typedef enum {
     SPSWS_STATE_WAKEUP,
     SPSWS_STATE_MEASURE,
     SPSWS_STATE_MONITORING,
-    SPSWS_STATE_WEATHER_DATA,
+    SPSWS_STATE_WEATHER,
     SPSWS_STATE_GEOLOC,
     SPSWS_STATE_RTC_CALIBRATION,
     SPSWS_STATE_ERROR_STACK,
+    SPSWS_STATE_TASK_CHECK,
     SPSWS_STATE_OFF,
     SPSWS_STATE_SLEEP,
     SPSWS_STATE_LAST
@@ -103,9 +104,9 @@ typedef union {
         unsigned sen15901_process :1;
         unsigned reset_request : 1;
         unsigned radio_enabled : 1;
+        unsigned weather_request :1;
+        unsigned measure_request :1;
         unsigned daily_rtc_calibration_done : 1;
-        unsigned fixed_hour_alarm :1;
-        unsigned wake_up :1;
         unsigned is_afternoon :1;
         unsigned day_changed :1;
         unsigned hour_changed :1;
@@ -151,16 +152,15 @@ typedef struct {
     SPSWS_state_t state;
     SPSWS_status_t status;
     volatile SPSWS_flags_t flags;
-    volatile uint32_t seconds_counter;
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-    SENSORS_HW_wind_tick_second_irq_cb_t wind_tick_second_callback;
-#endif
-#ifndef SPSWS_MODE_CLI
     // Wake-up management.
     RTC_time_t current_time;
     RTC_time_t previous_wake_up_time;
     // Measurements buffers.
+    uint32_t measurements_last_time_seconds;
     SPSWS_measurements_t measurements;
+#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
+    SENSORS_HW_wind_tick_second_irq_cb_t wind_tick_second_callback;
+#endif
     // Sigfox frames.
     SPSWS_EP_ul_payload_weather_t sigfox_ep_ul_payload_weather;
     SIGFOX_EP_ul_payload_monitoring_t sigfox_ep_ul_payload_monitoring;
@@ -170,33 +170,34 @@ typedef struct {
     // Downlink.
     RTC_time_t previous_downlink_time;
 #endif
-#endif
 } SPSWS_context_t;
 
 /*** SPSWS global variables ***/
 
+#ifndef SPSWS_MODE_CLI
 static SPSWS_context_t spsws_ctx;
+#endif
 
 /*** SPSWS local functions ***/
 
-/*******************************************************************/
-static void _SPSWS_tick_second_callback(void) {
-    // Update second counter.
-    spsws_ctx.seconds_counter++;
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-    if (spsws_ctx.wind_tick_second_callback != NULL) {
-        spsws_ctx.wind_tick_second_callback();
-    }
-#endif
-}
-
+#ifndef SPSWS_MODE_CLI
 /*******************************************************************/
 static void _SPSWS_fixed_hour_alarm_callback(void) {
     // Update local flags.
-    spsws_ctx.flags.fixed_hour_alarm = 1;
+    spsws_ctx.flags.weather_request = 1;
 }
+#endif
 
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
+/*******************************************************************/
+static void _SPSWS_tick_second_callback(void) {
+    if (spsws_ctx.wind_tick_second_callback != NULL) {
+        spsws_ctx.wind_tick_second_callback();
+    }
+}
+#endif
+
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
 /*******************************************************************/
 static void _SPSWS_sen15901_process_callback(void) {
     // Update local flag.
@@ -466,8 +467,10 @@ static void _SPSWS_compute_final_measurements(void) {
 static void _SPSWS_set_clock(uint8_t device_state) {
     // Local variables.
     RCC_status_t rcc_status = RCC_SUCCESS;
+#ifndef SPSWS_MODE_CLI
     RCC_clock_t mcu_clock_source = RCC_CLOCK_NONE;
     uint8_t clock_status = 0;
+#endif
     // Switch to HSE or HSI depending on state.
     if (device_state == 0) {
         // Switch to internal clock.
@@ -483,6 +486,7 @@ static void _SPSWS_set_clock(uint8_t device_state) {
         rcc_status = RCC_switch_to_hse(RCC_HSE_MODE_BYPASS);
         RCC_stack_error(ERROR_BASE_RCC);
     }
+#ifndef SPSWS_MODE_CLI
     // Update MCU clock source.
     mcu_clock_source = RCC_get_system_clock();
     spsws_ctx.status.mcu_clock_source = (mcu_clock_source == RCC_CLOCK_HSE) ? 0b1 : 0b0;
@@ -494,6 +498,7 @@ static void _SPSWS_set_clock(uint8_t device_state) {
     rcc_status = RCC_get_status(RCC_CLOCK_LSE, &clock_status);
     RCC_stack_error(ERROR_BASE_RCC);
     spsws_ctx.status.lse_status = (clock_status == 0) ? 0b0 : 0b1;
+#endif
 }
 
 #ifndef SPSWS_MODE_CLI
@@ -697,6 +702,7 @@ errors:
 }
 #endif
 
+#ifndef SPSWS_MODE_CLI
 /*******************************************************************/
 static void _SPSWS_init_context(void) {
     // Init context.
@@ -705,20 +711,17 @@ static void _SPSWS_init_context(void) {
     spsws_ctx.flags.por = 1;
     spsws_ctx.flags.radio_enabled = 1;
     spsws_ctx.status.all = 0;
-#ifndef SPSWS_MODE_CLI
-    spsws_ctx.seconds_counter = 0;
-#endif
+    // Reset measurements.
+    spsws_ctx.measurements_last_time_seconds = 0;
+    _SPSWS_reset_measurements();
     // Init station mode.
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
     spsws_ctx.status.station_mode = 0b1;
 #else
     spsws_ctx.status.station_mode = 0b0;
 #endif
-#ifndef SPSWS_MODE_CLI
-    // Reset measurements.
-    _SPSWS_reset_measurements();
-#endif
 }
+#endif
 
 /*******************************************************************/
 static void _SPSWS_init_hw(void) {
@@ -730,13 +733,15 @@ static void _SPSWS_init_hw(void) {
 #ifndef SPSWS_MODE_DEBUG
     IWDG_status_t iwdg_status = IWDG_SUCCESS;
 #endif
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
     SEN15901_status_t sen15901_status = SEN15901_SUCCESS;
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ULTIMETER_status_t ultimeter_status = ULTIMETER_SUCCESS;
 #endif
 #endif
+#ifndef SPSWS_MODE_CLI
     RTC_alarm_configuration_t rtc_alarm_config;
+#endif
     uint8_t device_id_lsbyte = 0;
     // Init error stack
     ERROR_stack_init();
@@ -762,11 +767,16 @@ static void _SPSWS_init_hw(void) {
     rcc_status = RCC_calibrate_internal_clocks(NVIC_PRIORITY_CLOCK_CALIBRATION);
     RCC_stack_error(ERROR_BASE_RCC);
     // Init RTC.
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
     rtc_status = RTC_init(&_SPSWS_tick_second_callback, NVIC_PRIORITY_RTC);
+#else
+    rtc_status = RTC_init(NULL, NVIC_PRIORITY_RTC);
+#endif
     RTC_stack_error(ERROR_BASE_RTC);
     // Read LS byte of the device ID to add a random delay in RTC alarm.
     nvm_status = NVM_read_byte((NVM_ADDRESS_SIGFOX_EP_ID + SIGFOX_EP_ID_SIZE_BYTES - 1), &device_id_lsbyte);
     NVM_stack_error(ERROR_BASE_NVM);
+#ifndef SPSWS_MODE_CLI
     // Init RTC alarm.
     rtc_alarm_config.mode = RTC_ALARM_MODE_DATE;
     rtc_alarm_config.date.mask = 1;
@@ -779,10 +789,11 @@ static void _SPSWS_init_hw(void) {
     rtc_alarm_config.seconds.value = (device_id_lsbyte % 60);
     rtc_status = RTC_start_alarm(RTC_ALARM_A, &rtc_alarm_config, &_SPSWS_fixed_hour_alarm_callback);
     RTC_stack_error(ERROR_BASE_RTC);
+#endif
     // Init delay timer.
     lptim_status = LPTIM_init(NVIC_PRIORITY_DELAY);
     LPTIM_stack_error(ERROR_BASE_LPTIM);
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
     // Init wind vane and rainfall driver.
     sen15901_status = SEN15901_init(&_SPSWS_sen15901_process_callback);
     SEN15901_stack_error(ERROR_BASE_SEN15901);
@@ -823,13 +834,13 @@ int main(void) {
     GPS_time_t gps_time;
     GPS_position_t gps_position;
     GPS_acquisition_status_t gps_acquisition_status = GPS_ACQUISITION_SUCCESS;
-    uint32_t gps_acquisition_duration_seconds = 0;
     SIGFOX_EP_API_application_message_t application_message;
     SIGFOX_EP_ul_payload_startup_t sigfox_ep_ul_payload_startup;
     SIGFOX_EP_ul_payload_geoloc_t sigfox_ep_ul_payload_geoloc;
     SIGFOX_EP_ul_payload_geoloc_timeout_t sigfox_ep_ul_payload_geoloc_timeout;
     ERROR_code_t error_code = 0;
     uint8_t sigfox_ep_ul_payload_error_stack[SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK];
+    uint32_t generic_u32 = 0;
     int32_t generic_s32_1 = 0;
     int32_t generic_s32_2 = 0;
     uint8_t idx = 0;
@@ -852,6 +863,7 @@ int main(void) {
         // Perform state machine.
         switch (spsws_ctx.state) {
         case SPSWS_STATE_STARTUP:
+            IWDG_reload();
             // Power on delay to wait for main power supply stabilization.
             lptim_status = LPTIM_delay_milliseconds(SPSWS_POWER_ON_DELAY_MS, LPTIM_DELAY_MODE_STOP);
             LPTIM_stack_error(ERROR_BASE_LPTIM);
@@ -878,10 +890,11 @@ int main(void) {
             spsws_ctx.state = SPSWS_STATE_RTC_CALIBRATION;
             break;
         case SPSWS_STATE_WAKEUP:
+            IWDG_reload();
             // Check alarm flag..
-            if (spsws_ctx.flags.fixed_hour_alarm != 0) {
+            if (spsws_ctx.flags.weather_request != 0) {
                 // Clear flag.
-                spsws_ctx.flags.fixed_hour_alarm = 0;
+                spsws_ctx.flags.weather_request = 0;
                 // Update flags.
                 _SPSWS_update_time_flags();
                 // Check hour change flag.
@@ -912,18 +925,22 @@ int main(void) {
                     spsws_ctx.state = SPSWS_STATE_OFF;
                 }
             }
-            else {
+            else if (spsws_ctx.flags.measure_request != 0) {
                 // Intermediate analog wake-up.
                 spsws_ctx.state = SPSWS_STATE_MEASURE;
             }
+            else {
+                spsws_ctx.state = SPSWS_STATE_OFF;
+            }
             break;
         case SPSWS_STATE_RTC_CALIBRATION:
+            IWDG_reload();
             // Reset status to default.
             spsws_ctx.status.daily_rtc_calibration = 0;
             // Turn GPS on.
             POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_GPS, LPTIM_DELAY_MODE_SLEEP);
             // Get current time from GPS.
-            gps_status = GPS_get_time(&gps_time, SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS, &gps_acquisition_duration_seconds, &gps_acquisition_status);
+            gps_status = GPS_get_time(&gps_time, SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS, &generic_u32, &gps_acquisition_status);
             GPS_stack_error(ERROR_BASE_GPS);
             // Turn GPS off.
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_GPS);
@@ -949,8 +966,8 @@ int main(void) {
             if (spsws_ctx.flags.por != 0) {
                 // In POR condition, RTC alarm will occur during the first GPS time acquisition because of the RTC reset and the random delay.
                 // Flags are manually cleared to avoid wake-up directly after the first RTC calibration.
-                spsws_ctx.flags.fixed_hour_alarm = 0;
-                spsws_ctx.flags.wake_up = 0;
+                spsws_ctx.flags.weather_request = 0;
+                spsws_ctx.flags.measure_request = 0;
                 // Update state.
                 spsws_ctx.state = SPSWS_STATE_ERROR_STACK;
             }
@@ -962,6 +979,7 @@ int main(void) {
             spsws_ctx.flags.por = 0;
             break;
         case SPSWS_STATE_MEASURE:
+            IWDG_reload();
             // Retrieve internal ADC data.
             POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
             // MCU voltage.
@@ -1046,6 +1064,8 @@ int main(void) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.uv_index), generic_s32_1);
             }
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_SENSORS);
+            // Clear flag.
+            spsws_ctx.flags.measure_request = 0;
             // Go to off state.
             spsws_ctx.state = SPSWS_STATE_OFF;
             break;
@@ -1064,9 +1084,10 @@ int main(void) {
 #endif
             _SPSWS_send_sigfox_message(&application_message);
             // Compute next state.
-            spsws_ctx.state = SPSWS_STATE_WEATHER_DATA;
+            spsws_ctx.state = SPSWS_STATE_WEATHER;
             break;
-        case SPSWS_STATE_WEATHER_DATA:
+        case SPSWS_STATE_WEATHER:
+            IWDG_reload();
 #ifdef SPSWS_SEN15901_EMULATOR
             // Synchronize emulator on weather data message transmission.
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 1);
@@ -1114,12 +1135,13 @@ int main(void) {
             }
             break;
         case SPSWS_STATE_GEOLOC:
+            IWDG_reload();
             // Reset status to default.
             spsws_ctx.status.daily_geoloc = 0;
             // Turn GPS on.
             POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_GPS, LPTIM_DELAY_MODE_SLEEP);
             // Get geolocation from GPS.
-            gps_status = GPS_get_position(&gps_position, SPSWS_GEOLOC_TIMEOUT_SECONDS, &gps_acquisition_duration_seconds, &gps_acquisition_status);
+            gps_status = GPS_get_position(&gps_position, SPSWS_GEOLOC_TIMEOUT_SECONDS, &generic_u32, &gps_acquisition_status);
             GPS_stack_error(ERROR_BASE_GPS);
             // Turn GPS off.
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_GPS);
@@ -1134,7 +1156,7 @@ int main(void) {
                 sigfox_ep_ul_payload_geoloc.longitude_seconds = gps_position.long_seconds;
                 sigfox_ep_ul_payload_geoloc.longitude_east_flag = gps_position.long_east_flag;
                 sigfox_ep_ul_payload_geoloc.altitude_meters = gps_position.altitude;
-                sigfox_ep_ul_payload_geoloc.gps_acquisition_duration_seconds = gps_acquisition_duration_seconds;
+                sigfox_ep_ul_payload_geoloc.gps_acquisition_duration_seconds = generic_u32;
                 // Update message parameters.
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
                 application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_geoloc.frame);
@@ -1144,7 +1166,7 @@ int main(void) {
             }
             else {
                 sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_status = gps_acquisition_status;
-                sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_duration_seconds = gps_acquisition_duration_seconds;
+                sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_duration_seconds = generic_u32;
                 // Update message parameters.
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
                 application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_geoloc_timeout.frame);
@@ -1161,6 +1183,7 @@ int main(void) {
             spsws_ctx.state = SPSWS_STATE_ERROR_STACK;
             break;
         case SPSWS_STATE_ERROR_STACK:
+            IWDG_reload();
             // Import Sigfox library error stack.
             ERROR_import_sigfox_stack();
             // Check stack.
@@ -1186,6 +1209,7 @@ int main(void) {
             spsws_ctx.state = SPSWS_STATE_OFF;
             break;
         case SPSWS_STATE_OFF:
+            IWDG_reload();
             // Switch to internal clock.
             _SPSWS_set_clock(0);
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
@@ -1200,21 +1224,12 @@ int main(void) {
             SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
             // Enter sleep mode.
-            spsws_ctx.state = SPSWS_STATE_SLEEP;
+            spsws_ctx.state = SPSWS_STATE_TASK_CHECK;
             break;
-        case SPSWS_STATE_SLEEP:
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-            // Check reset request.
-            if (spsws_ctx.flags.reset_request != 0) {
-                PWR_software_reset();
-            }
-#endif
-            // Enter sleep mode.
+        case SPSWS_STATE_TASK_CHECK:
             IWDG_reload();
-#ifndef SPSWS_MODE_DEBUG
-            PWR_enter_deepsleep_mode(PWR_DEEPSLEEP_MODE_STOP);
-            IWDG_reload();
-#endif
+            // Read uptime.
+            generic_u32 = RTC_get_uptime_seconds();
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
             // Check wind driver process flag.
 #ifdef SPSWS_WIND_VANE_ULTIMETER
@@ -1236,25 +1251,16 @@ int main(void) {
 #endif
 #endif
             // Check measurements period.
-            if (spsws_ctx.seconds_counter >= SPSWS_MEASUREMENT_PERIOD_SECONDS) {
-                // Reset counter and wake-up for intermediate measurement.
-                spsws_ctx.seconds_counter = 0;
-                spsws_ctx.flags.wake_up = 1;
+            if (generic_u32 >= (spsws_ctx.measurements_last_time_seconds + SPSWS_MEASUREMENT_PERIOD_SECONDS)) {
+                // Set request and update last time.
+                spsws_ctx.flags.measure_request = 1;
+                spsws_ctx.measurements_last_time_seconds = generic_u32;
             }
-            // Check RTC alarm.
-            if (spsws_ctx.flags.fixed_hour_alarm != 0) {
-                // Wake up for radio transmission.
-                spsws_ctx.flags.wake_up = 1;
+            // Go to sleep by default.
+            spsws_ctx.state = SPSWS_STATE_SLEEP;
+            // Check wake-up flags.
+            if ((spsws_ctx.flags.weather_request != 0) || (spsws_ctx.flags.measure_request != 0)) {
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-                // Stop rainfall measurement.
-                sen15901_status = SEN15901_set_rainfall_measurement(0);
-                SEN15901_stack_error(ERROR_BASE_SEN15901);
-#endif
-            }
-            // Wake-up if required.
-            if (spsws_ctx.flags.wake_up != 0) {
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-                // Stop wind measurement.
 #ifdef SPSWS_WIND_VANE_ULTIMETER
                 ultimeter_status = ULTIMETER_set_wind_measurement(0);
                 ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
@@ -1262,11 +1268,26 @@ int main(void) {
                 sen15901_status = SEN15901_set_wind_measurement(0);
                 SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
+                if (spsws_ctx.flags.weather_request != 0) {
+                    sen15901_status = SEN15901_set_rainfall_measurement(0);
+                    SEN15901_stack_error(ERROR_BASE_SEN15901);
+                }
 #endif
                 // Clear flag and update state.
-                spsws_ctx.flags.wake_up = 0;
                 spsws_ctx.state = SPSWS_STATE_WAKEUP;
             }
+            break;
+        case SPSWS_STATE_SLEEP:
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            // Check reset request.
+            if (spsws_ctx.flags.reset_request != 0) {
+                PWR_software_reset();
+            }
+#endif
+            // Enter sleep mode.
+            IWDG_reload();
+            PWR_enter_deepsleep_mode(PWR_DEEPSLEEP_MODE_STOP);
+            IWDG_reload();
             break;
         default:
             // Enter standby mode.
@@ -1284,7 +1305,6 @@ int main (void) {
     // Local variables.
     CLI_status_t cli_status = CLI_SUCCESS;
     // Init board.
-    _SPSWS_init_context();
     _SPSWS_init_hw();
     // Switch to accurate clock.
     _SPSWS_set_clock(1);
