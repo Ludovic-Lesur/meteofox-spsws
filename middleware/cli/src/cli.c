@@ -370,6 +370,7 @@ static AT_status_t _CLI_adc_callback(void) {
     int32_t generic_s32 = 0;
     // Turn analog front-end on.
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
+    POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_ACTIVE);
     // MCU voltage.
     analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VMCU_MV, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
@@ -406,6 +407,7 @@ static AT_status_t _CLI_adc_callback(void) {
     AT_reply_add_string("%");
     AT_send_reply();
 errors:
+    POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_ANALOG);
     return status;
 }

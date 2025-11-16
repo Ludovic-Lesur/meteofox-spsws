@@ -8,6 +8,7 @@
 #ifndef __SIGFOX_EP_FRAMES_H__
 #define __SIGFOX_EP_FRAMES_H__
 
+#include "sigfox_ep_flags.h"
 #include "sigfox_types.h"
 #include "spsws_flags.h"
 #include "types.h"
@@ -121,6 +122,7 @@ typedef union {
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SIGFOX_EP_ul_payload_geoloc_timeout_t;
 
+#ifdef SIGFOX_EP_BIDIRECTIONAL
 /*!******************************************************************
  * \enum SIGFOX_EP_dl_op_code_t
  * \brief Sigfox downlink operation codes.
@@ -128,7 +130,46 @@ typedef union {
 typedef enum {
     SIGFOX_EP_DL_OP_CODE_NOP = 0,
     SIGFOX_EP_DL_OP_CODE_RESET,
+    SIGFOX_EP_DL_OP_CODE_SET_WEATHER_DATA_PERIOD,
     SIGFOX_EP_DL_OP_CODE_LAST
 } SIGFOX_EP_dl_op_code_t;
+#endif
+
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+/*!******************************************************************
+ * \enum SIGFOX_EP_dl_weather_data_period_t
+ * \brief Sigfox downlink weather data period field values.
+ *******************************************************************/
+typedef enum {
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES = 0,
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_30_MINUTES,
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_20_MINUTES,
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_15_MINUTES,
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_12_MINUTES,
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_10_MINUTES,
+    SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST
+} SIGFOX_EP_dl_weather_data_period_t;
+#endif
+
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+/*!******************************************************************
+ * \enum SIGFOX_EP_dl_payload_t
+ * \brief Sigfox downlink frames format.
+ *******************************************************************/
+typedef union {
+    uint8_t frame[SIGFOX_DL_PAYLOAD_SIZE_BYTES];
+    struct {
+        unsigned op_code :8;
+        union {
+            struct {
+                unsigned weather_data_period :8;
+                unsigned unused0 :16;
+                unsigned unused1 :16;
+                unsigned unused2 :16;
+            } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) set_weather_data_period;
+        };
+    } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
+} SIGFOX_EP_dl_payload_t;
+#endif
 
 #endif /* __SIGFOX_EP_FRAMES_H__ */
