@@ -1369,7 +1369,7 @@ int main(void) {
                     spsws_ctx.state = SPSWS_STATE_WEATHER;
                 }
             }
-            if (spsws_ctx.flags.measure_request != 0) {
+            else if (spsws_ctx.flags.measure_request != 0) {
                 // Compute next state
                 spsws_ctx.state = SPSWS_STATE_MEASURE;
             }
