@@ -197,6 +197,7 @@ static void _SPSWS_sharp_hour_alarm_callback(void) {
     spsws_ctx.sharp_hour_uptime = RTC_get_uptime_seconds();
 #else
     spsws_ctx.flags.weather_request = 1;
+    spsws_ctx.flags.monitoring_request = 1;
 #endif
 }
 #endif
