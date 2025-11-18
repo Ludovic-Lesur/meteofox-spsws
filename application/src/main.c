@@ -105,13 +105,14 @@ typedef union {
     struct {
         unsigned ultimeter_process :1;
         unsigned sen15901_process :1;
-        unsigned weather_request_enabled :1;
         unsigned radio_enabled : 1;
         unsigned reset_request : 1;
         unsigned rtc_calibration_request : 1;
         unsigned error_stack_request :1;
         unsigned geoloc_request :1;
         unsigned downlink_request :1;
+        unsigned weather_request_intermediate :1;
+        unsigned weather_request_enabled :1;
         unsigned weather_request :1;
         unsigned monitoring_request :1;
         unsigned measure_request :1;
@@ -1098,7 +1099,11 @@ int main(void) {
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 1);
 #endif
             // Send uplink weather frame.
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            application_message.common_parameters.ul_bit_rate = ((spsws_ctx.flags.weather_request_intermediate == 0) ? SIGFOX_UL_BIT_RATE_100BPS : SIGFOX_UL_BIT_RATE_600BPS);
+#else
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
+#endif
             application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_ep_ul_payload_weather.frame);
             application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
@@ -1321,6 +1326,7 @@ int main(void) {
                 // Set requests and update last time.
                 spsws_ctx.flags.monitoring_request = 1;
                 spsws_ctx.flags.weather_request = 1;
+                spsws_ctx.flags.weather_request_intermediate = 0;
                 spsws_ctx.weather_last_time_seconds = spsws_ctx.sharp_hour_uptime;
                 // Reset message count.
                 spsws_ctx.weather_message_count = 1;
@@ -1332,6 +1338,7 @@ int main(void) {
                 if ((generic_u32_1 >= (spsws_ctx.weather_last_time_seconds + generic_u32_2)) && (spsws_ctx.weather_message_count < (3600 / generic_u32_2))) {
                     // Set request and update last time.
                     spsws_ctx.flags.weather_request = spsws_ctx.flags.weather_request_enabled;
+                    spsws_ctx.flags.weather_request_intermediate = 1;
                     spsws_ctx.weather_last_time_seconds = generic_u32_1;
                     // Update message count.
                     spsws_ctx.weather_message_count++;
