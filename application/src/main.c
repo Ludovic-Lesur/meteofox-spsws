@@ -1368,11 +1368,11 @@ int main(void) {
 #endif
                     // Update last wakeup time.
                     _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_WAKE_UP);
+                    // Switch to accurate clock.
+                    _SPSWS_set_clock(1);
                     // Calibrate clocks.
                     rcc_status = RCC_calibrate_internal_clocks(NVIC_PRIORITY_CLOCK_CALIBRATION);
                     RCC_stack_error(ERROR_BASE_RCC);
-                    // Switch to accurate clock.
-                    _SPSWS_set_clock(1);
                     // Compute next state
                     spsws_ctx.state = SPSWS_STATE_WEATHER;
                 }
