@@ -982,11 +982,12 @@ int main(void) {
             sigfox_ep_ul_payload_startup.dirty_flag = GIT_DIRTY_FLAG;
             // Clear reset flags.
             PWR_clear_reset_flags();
-            // Send SW version frame.
+            // Send startup message.
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
             application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_startup.frame);
             application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_STARTUP;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
+            application_message.common_parameters.number_of_frames = 3;
             application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
             _SPSWS_send_sigfox_message(&application_message);
@@ -1098,16 +1099,15 @@ int main(void) {
             // Synchronize emulator on weather data message transmission.
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 1);
 #endif
-            // Send uplink weather frame.
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-            application_message.common_parameters.ul_bit_rate = ((spsws_ctx.flags.weather_request_intermediate == 0) ? SIGFOX_UL_BIT_RATE_100BPS : SIGFOX_UL_BIT_RATE_600BPS);
-#else
-            application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
-#endif
+            // Send uplink weather message.
             application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_ep_ul_payload_weather.frame);
             application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
+            application_message.common_parameters.number_of_frames = ((spsws_ctx.flags.weather_request_intermediate == 0) ? 3 : 1);
+            application_message.common_parameters.ul_bit_rate = ((spsws_ctx.flags.weather_request_intermediate == 0) ? SIGFOX_UL_BIT_RATE_100BPS : SIGFOX_UL_BIT_RATE_600BPS);
             application_message.bidirectional_flag = (spsws_ctx.flags.downlink_request == 0) ? SIGFOX_FALSE : SIGFOX_TRUE;
+#else
+            application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
 #endif
             _SPSWS_send_sigfox_message(&application_message);
 #ifdef SPSWS_SEN15901_EMULATOR
@@ -1121,11 +1121,12 @@ int main(void) {
             if (spsws_ctx.flags.monitoring_request != 0) {
                 // Read status byte.
                 spsws_ctx.sigfox_ep_ul_payload_monitoring.status = spsws_ctx.status.all;
-                // Send uplink monitoring frame.
+                // Send uplink monitoring message.
                 application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
                 application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_ep_ul_payload_monitoring.frame);
                 application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_MONITORING;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
+                application_message.common_parameters.number_of_frames = 3;
                 application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
                 _SPSWS_send_sigfox_message(&application_message);
@@ -1160,8 +1161,7 @@ int main(void) {
                     sigfox_ep_ul_payload_geoloc.longitude_east_flag = gps_position.long_east_flag;
                     sigfox_ep_ul_payload_geoloc.altitude_meters = gps_position.altitude;
                     sigfox_ep_ul_payload_geoloc.gps_acquisition_duration_seconds = generic_u32_1;
-                    // Update message parameters.
-                    application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
+                    // Send uplink geolocation message.
                     application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_geoloc.frame);
                     application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC;
                     // Update status bit.
@@ -1170,12 +1170,13 @@ int main(void) {
                 else {
                     sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_status = gps_acquisition_status;
                     sigfox_ep_ul_payload_geoloc_timeout.gps_acquisition_duration_seconds = generic_u32_1;
-                    // Update message parameters.
-                    application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
+                    // Send uplink geolocation timeout message.
                     application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_geoloc_timeout.frame);
                     application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC_TIMEOUT;
                 }
+                application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
+                application_message.common_parameters.number_of_frames = 3;
                 application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
                 // Send uplink geolocation frame.
@@ -1207,6 +1208,7 @@ int main(void) {
                     application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_error_stack);
                     application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
+                    application_message.common_parameters.number_of_frames = 3;
                     application_message.bidirectional_flag = SIGFOX_FALSE;
 #endif
                     _SPSWS_send_sigfox_message(&application_message);
