@@ -1,0 +1,44 @@
+name: MCU binaries build
+on:
+  push:
+    tags:
+      - 'sw*'
+
+jobs:
+  generate-cmake-matrix:
+    uses: Ludovic-Lesur/workflows/.github/workflows/generate-cmake-matrix.yml@master
+
+  build:
+    needs: generate-cmake-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        flags_file: ${{ fromJson(needs.generate-cmake-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          fetch-tags: 'true'
+          
+      - name: Create version header file
+        run: |
+          cd script/
+          bash git_version.sh
+
+      - name: Download CMake compilation flags files
+        uses: actions/download-artifact@v7
+        with:
+          path: ${{ github.workspace }}/cmake-flags-files
+
+      - name: Build
+        uses: Ludovic-Lesur/actions/cmake-arm-none-eabi@master
+        with:
+          flags_file_path: ${{github.workspace}}/cmake-flags-files/${{matrix.flags_file}}
+          project_name: ${{ github.event.repository.name }}
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    uses: Ludovic-Lesur/workflows/.github/workflows/generate-release.yml@master

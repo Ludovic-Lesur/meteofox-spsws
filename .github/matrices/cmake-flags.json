@@ -1,0 +1,61 @@
+{
+    "hw_configuration_list": [
+        {
+            "hw_flags": {
+                "SPSWS_HW_VERSION": "HW1_0"
+            },
+            "sw_configuration_list": [
+                {
+                    "sw_flags": {
+                        "SPSWS_MODE_CLI" : "OFF",
+                        "SPSWS_WIND_RAINFALL_MEASUREMENTS" : "OFF",
+                        "SPSWS_WIND_VANE_ULTIMETER" : "OFF",
+                        "SPSWS_SEN15901_EMULATOR" : "OFF"
+                    }
+                }
+            ]
+        },
+        {
+            "hw_flags": {
+                "SPSWS_HW_VERSION": "HW2_0"
+            },
+            "sw_configuration_list": [
+                {
+                    "sw_flags": {
+                        "SPSWS_MODE_CLI" : "OFF",
+                        "SPSWS_WIND_RAINFALL_MEASUREMENTS" : "ON",
+                        "SPSWS_WIND_VANE_ULTIMETER" : "OFF",
+                        "SPSWS_SEN15901_EMULATOR" : "OFF"
+                    }
+                },
+                {
+                    "name": "ultimeter",
+                    "sw_flags": {
+                        "SPSWS_MODE_CLI" : "OFF",
+                        "SPSWS_WIND_RAINFALL_MEASUREMENTS" : "ON",
+                        "SPSWS_WIND_VANE_ULTIMETER" : "ON",
+                        "SPSWS_SEN15901_EMULATOR" : "OFF"
+                    }
+                },
+                {
+                    "name": "sen15901-emulator",
+                    "sw_flags": {
+                        "SPSWS_MODE_CLI" : "OFF",
+                        "SPSWS_WIND_RAINFALL_MEASUREMENTS" : "ON",
+                        "SPSWS_WIND_VANE_ULTIMETER" : "OFF",
+                        "SPSWS_SEN15901_EMULATOR" : "ON"
+                    }
+                },
+                {
+                    "name": "cli",
+                    "sw_flags": {
+                        "SPSWS_MODE_CLI" : "ON",
+                        "SPSWS_WIND_RAINFALL_MEASUREMENTS" : "ON",
+                        "SPSWS_WIND_VANE_ULTIMETER" : "OFF",
+                        "SPSWS_SEN15901_EMULATOR" : "OFF"
+                    }
+                }
+            ]
+        }
+    ]
+}
