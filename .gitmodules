@@ -40,3 +40,6 @@
 [submodule "sigfox-ep-addon-rfp"]
     path = middleware/sigfox/sigfox-ep-addon-rfp
     url = https://github.com/sigfox-tech-radio/sigfox-ep-addon-rfp.git
+[submodule "cmake-arm-none-eabi"]
+    path = script/cmake-arm-none-eabi
+    url = https://github.com/Ludovic-Lesur/cmake-arm-none-eabi.git

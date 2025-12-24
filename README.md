@@ -6,10 +6,10 @@ The aim of the **MeteoFox** project was to design an autonomous weather station 
 
 The boards were designed on **Circuit Maker V1.3**. Below is the list of hardware revisions:
 
-| Hardware revision | Description | Status |
-|:---:|:---:|:---:|
-| [SPSWS HW1.0](https://365.altium.com/files/C5470066-C92D-11EB-A2F6-0A0ABF5AFC1B) | Initial version for prototyping. | :x: |
-| [SPSWS HW2.0](https://365.altium.com/files/C7B06FC0-C92D-11EB-A2F6-0A0ABF5AFC1B) | PCB fitted to outdoor casing.<br>Add connectors to external sensors and antennas.<br>Separate SPI interfaces for radio and ADC.<br>Improved power tree.<br>Shielding added on the radio circuitry. | :white_check_mark: |
+| Hardware revision | Description  | `cmake_hw_version` | Status |
+|:---:|:---:|:---:|:---:|
+| [SPSWS HW1.0](https://365.altium.com/files/C5470066-C92D-11EB-A2F6-0A0ABF5AFC1B) | Initial version for prototyping. | `HW1_0` | :x: |
+| [SPSWS HW2.0](https://365.altium.com/files/C7B06FC0-C92D-11EB-A2F6-0A0ABF5AFC1B) | PCB fitted to outdoor casing.<br>Add connectors to external sensors and antennas.<br>Separate SPI interfaces for radio and ADC.<br>Improved power tree.<br>Shielding added on the radio circuitry. | `HW2_0` | :white_check_mark: |
 
 The weather station is also composed of 2 daughter boards which embed the meteorological sensors. These boards are located outdoor in a dedicated casing, out of the main enclosure.
 
@@ -61,3 +61,21 @@ The project is organized as follow:
 * The weather station can be placed is very isolated places thanks to the **long range** performance.
 
 The project is based on the [Sigfox end-point open source library](https://github.com/sigfox-tech-radio/sigfox-ep-lib) which is embedded as a **Git submodule**.
+
+## Build
+
+The project can be compiled by command line with `cmake`.
+
+```bash
+mkdir build
+cd build
+cmake -DCMAKE_TOOLCHAIN_FILE="script/cmake-arm-none-eabi/toolchain.cmake" \
+      -DTOOLCHAIN_PATH="<arm_none_eabi_gcc_path>" \
+      -DSPSWS_HW_VERSION="<cmake_hw_version>" \
+      -DSPSWS_MODE_CLI=OFF \
+      -DSPSWS_WIND_RAINFALL_MEASUREMENTS=ON \
+      -DSPSWS_WIND_VANE_ULTIMETER=OFF \
+      -DSPSWS_SEN15901_EMULATOR=OFF \
+      -G "Unix Makefiles" ..
+make all
+```
