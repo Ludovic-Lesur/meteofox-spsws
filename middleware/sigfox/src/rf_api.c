@@ -765,8 +765,7 @@ RF_API_status_t RF_API_get_version(sfx_u8 **version, sfx_u8 *version_size_char) 
 /*******************************************************************/
 void RF_API_error(void) {
     // Force all front-end off.
-    RFE_set_path(RFE_PATH_NONE);
-    POWER_disable(POWER_REQUESTER_ID_RF_API, POWER_DOMAIN_RADIO_TCXO);
-    POWER_disable(POWER_REQUESTER_ID_RF_API, POWER_DOMAIN_RADIO);
+    RF_API_de_init();
+    RF_API_sleep();
 }
 #endif
