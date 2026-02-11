@@ -334,6 +334,7 @@ static void _SPSWS_compute_final_measurements(void) {
 #endif
     SEN15901_status_t sen15901_status = SEN15901_SUCCESS;
     int32_t generic_s32_2 = 0;
+    SIGFOX_EP_ul_payload_rainfall_t rainfall;
 #endif
     // Temperature.
     spsws_ctx.sigfox_ep_ul_payload_weather.tamb_degrees = SIGFOX_EP_ERROR_VALUE_TEMPERATURE;
@@ -501,17 +502,28 @@ static void _SPSWS_compute_final_measurements(void) {
         spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_two_degrees = (generic_s32_1 >> 1);
     }
     // Rainfall.
-    spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm = SIGFOX_EP_ERROR_VALUE_RAIN;
+    rainfall.all = SIGFOX_EP_ERROR_VALUE_RAIN;
     sen15901_status = SEN15901_get_rainfall(&generic_s32_1);
     SEN15901_stack_error(ERROR_BASE_SEN15901);
     // Check status.
     if (sen15901_status == SEN15901_SUCCESS) {
-        spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm = (generic_s32_1 / 1000);
-        // Rounding operation.
-        if ((generic_s32_1 - (spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm * 1000)) >= 500) {
-            spsws_ctx.sigfox_ep_ul_payload_weather.rainfall_mm++;
+        // Clamp value if needed.
+        if (generic_s32_1 > SIGFOX_EP_RAINFALL_MAX_UM) {
+            generic_s32_1 = SIGFOX_EP_RAINFALL_MAX_UM;
+        }
+        // Check range.
+        if (generic_s32_1 > SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM) {
+            // Unit in millimeter.
+            rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM;
+            rainfall.value = (generic_s32_1 / 1000);
+        }
+        else {
+            // Unit in tenth of millimeter.
+            rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_TENTH_MM;
+            rainfall.value = (generic_s32_1 / 100);
         }
     }
+    spsws_ctx.sigfox_ep_ul_payload_weather.rainfall = rainfall.all;
 #endif
 }
 #endif

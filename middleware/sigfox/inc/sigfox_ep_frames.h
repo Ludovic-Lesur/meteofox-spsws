@@ -36,6 +36,9 @@
 #define SIGFOX_EP_ERROR_VALUE_PRESSURE              0xFFFF
 #define SIGFOX_EP_ERROR_VALUE_WIND                  0xFF
 #define SIGFOX_EP_ERROR_VALUE_RAIN                  0xFF
+// Rainfall unit threshold.
+#define SIGFOX_EP_RAINFALL_MAX_UM                   126000
+#define SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM        12700
 
 /*** SIGFOX EP FRAMES structures ***/
 
@@ -56,6 +59,21 @@ typedef union {
 } SIGFOX_EP_ul_payload_startup_t;
 
 /*******************************************************************/
+typedef enum {
+    SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_TENTH_MM = 0b0,
+    SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM = 0b1
+} SIGFOX_EP_ul_payload_rainfall_unit_t;
+
+/*******************************************************************/
+typedef union {
+    uint8_t all;
+    struct {
+        unsigned value: 7;
+        SIGFOX_EP_ul_payload_rainfall_unit_t unit :1;
+    } __attribute__((scalar_storage_order("little-endian"))) __attribute__((packed));
+} SIGFOX_EP_ul_payload_rainfall_t;
+
+/*******************************************************************/
 typedef union {
     uint8_t frame[SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER];
     struct {
@@ -68,7 +86,7 @@ typedef union {
         unsigned wind_speed_average_kmh :8;
         unsigned wind_speed_peak_kmh :8;
         unsigned wind_direction_average_two_degrees :8;
-        unsigned rainfall_mm :8;
+        unsigned rainfall :8;
 #endif
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_EP_ul_payload_weather_t;
