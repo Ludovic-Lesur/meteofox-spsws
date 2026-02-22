@@ -516,6 +516,10 @@ static void _SPSWS_compute_final_measurements(void) {
             // Unit in millimeter.
             rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM;
             rainfall.value = (generic_s32_1 / 1000);
+            // Rounding operation.
+            if ((generic_s32_1 - (rainfall.value * 1000)) >= 500) {
+                rainfall.value++;
+            }
         }
         else {
             // Unit in tenth of millimeter.
