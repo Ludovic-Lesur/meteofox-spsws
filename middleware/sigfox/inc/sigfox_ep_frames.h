@@ -27,15 +27,17 @@
 #define SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC            11
 #define SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC_TIMEOUT    2
 // Error values.
-#define SIGFOX_EP_ERROR_VALUE_ANALOG_12BITS         0xFFF
-#define SIGFOX_EP_ERROR_VALUE_ANALOG_16BITS         0xFFFF
-#define SIGFOX_EP_ERROR_VALUE_TEMPERATURE           0x7F
+#define SIGFOX_EP_ERROR_VALUE_TEMPERATURE           0x7FF
 #define SIGFOX_EP_ERROR_VALUE_HUMIDITY              0xFF
-#define SIGFOX_EP_ERROR_VALUE_LIGHT                 0xFF
-#define SIGFOX_EP_ERROR_VALUE_UV_INDEX              0xFF
+#define SIGFOX_EP_ERROR_VALUE_SUNSHINE_LIGHT        0xFF
+#define SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX     0xF
 #define SIGFOX_EP_ERROR_VALUE_PRESSURE              0xFFFF
 #define SIGFOX_EP_ERROR_VALUE_WIND                  0xFF
 #define SIGFOX_EP_ERROR_VALUE_RAIN                  0xFF
+#define SIGFOX_EP_ERROR_VALUE_SOURCE_VOLTAGE        0xFFF
+#define SIGFOX_EP_ERROR_VALUE_STORAGE_VOLTAGE       0xFFF
+#define SIGFOX_EP_ERROR_VALUE_MCU_TEMPERATURE       0x7F
+#define SIGFOX_EP_ERROR_VALUE_MCU_VOLTAGE           0xFFF
 // Rainfall unit threshold.
 #define SIGFOX_EP_RAINFALL_MAX_UM                   126000
 #define SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM        12700
@@ -77,11 +79,11 @@ typedef union {
 typedef union {
     uint8_t frame[SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER];
     struct {
-        unsigned tamb_degrees :8;
-        unsigned hamb_percent :8;
-        unsigned light_percent :8;
-        unsigned uv_index :8;
-        unsigned patm_abs_tenth_hpa :16;
+        unsigned temperature_tenth_degrees :12;
+        unsigned humidity_percent :8;
+        unsigned sunshine_light_percent :8;
+        unsigned sunshine_uv_index :4;
+        unsigned pressure_atmospheric_absolute_tenth_hpa :16;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
         unsigned wind_speed_average_kmh :8;
         unsigned wind_speed_peak_kmh :8;
@@ -98,12 +100,12 @@ typedef union {
 typedef union {
     uint8_t frame[SIGFOX_EP_UL_PAYLOAD_SIZE_MONITORING];
     struct {
-        unsigned tmcu_degrees :8;
-        unsigned tpcb_degrees :8;
-        unsigned hpcb_percent :8;
-        unsigned vsrc_mv :16;
-        unsigned vcap_mv :12;
-        unsigned vmcu_mv :12;
+        unsigned temperature_tenth_degrees :12;
+        unsigned humidity_percent :8;
+        unsigned source_voltage_ten_mv :12;
+        unsigned storage_voltage_mv :12;
+        unsigned mcu_temperature_degrees :8;
+        unsigned mcu_voltage_mv :12;
         unsigned status :8;
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SIGFOX_EP_ul_payload_monitoring_t;
