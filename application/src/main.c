@@ -383,6 +383,10 @@ static void _SPSWS_compute_final_measurements(void) {
         math_status = MATH_max(spsws_ctx.measurements.sunshine_uv_index.sample_buffer, sample_count, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
+            // Clamp value.
+            if (generic_s32_1 >= SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX) {
+                generic_s32_1 = (SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX - 1);
+            }
             spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_uv_index = (uint8_t) generic_s32_1;
         }
     }
