@@ -64,6 +64,7 @@
 #define SPSWS_MEASUREMENT_PERIOD_SECONDS                60
 #define SPSWS_MEASUREMENT_BUFFER_SIZE                   (3600 / SPSWS_MEASUREMENT_PERIOD_SECONDS)
 #ifdef SPSWS_SEN15901_EMULATOR
+#define SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO      GPIO_DIO3
 #define SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO            GPIO_DIO4
 #endif
 
@@ -921,7 +922,8 @@ static void _SPSWS_init_hw(void) {
     // Init LED pin.
     GPIO_configure(&GPIO_LED, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 #ifdef SPSWS_SEN15901_EMULATOR
-    // Init SEN15901 emulator synchronization pin.
+    // Init SEN15901 emulator pins.
+    GPIO_configure(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
     GPIO_configure(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 #endif
 }
@@ -1112,7 +1114,8 @@ int main(void) {
             _SPSWS_compute_final_measurements();
             _SPSWS_reset_measurements();
 #ifdef SPSWS_SEN15901_EMULATOR
-            // Synchronize emulator on weather data message transmission.
+            // Latch battery charger and synchronize emulator on weather data message transmission.
+            GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 0);
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 1);
 #endif
             // Send uplink weather message.
@@ -1127,6 +1130,11 @@ int main(void) {
 #endif
             _SPSWS_send_sigfox_message(&application_message);
 #ifdef SPSWS_SEN15901_EMULATOR
+            if ((spsws_ctx.sigfox_ep_ul_payload_monitoring.source_voltage_ten_mv != SIGFOX_EP_ERROR_VALUE_SOURCE_VOLTAGE) &&
+                (spsws_ctx.sigfox_ep_ul_payload_monitoring.source_voltage_ten_mv > 500))
+            {
+                GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 1);
+            }
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 0);
 #endif
             // Compute next state.
