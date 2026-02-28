@@ -1039,6 +1039,14 @@ int main(void) {
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.source_voltage_mv), generic_s32_1);
             }
+#ifdef SPSWS_SEN15901_EMULATOR
+            if ((analog_status == ANALOG_SUCCESS) && (generic_s32_1 >= 5000)) {
+                GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 1);
+            }
+            else {
+                GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 0);
+            }
+#endif
             // Supercap voltage.
             analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_STORAGE_VOLTAGE_MV, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
@@ -1134,11 +1142,6 @@ int main(void) {
 #endif
             _SPSWS_send_sigfox_message(&application_message);
 #ifdef SPSWS_SEN15901_EMULATOR
-            if ((spsws_ctx.sigfox_ep_ul_payload_monitoring.source_voltage_ten_mv != SIGFOX_EP_ERROR_VALUE_SOURCE_VOLTAGE) &&
-                (spsws_ctx.sigfox_ep_ul_payload_monitoring.source_voltage_ten_mv > 500))
-            {
-                GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 1);
-            }
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 0);
 #endif
             // Compute next state.
