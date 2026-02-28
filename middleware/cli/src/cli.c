@@ -372,36 +372,36 @@ static AT_status_t _CLI_adc_callback(void) {
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_ACTIVE);
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_ACTIVE);
     // MCU voltage.
-    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VMCU_MV, &generic_s32);
+    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_MCU_VOLTAGE_MV, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
-    AT_reply_add_string("Vmcu=");
+    AT_reply_add_string("mcu_voltage=");
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("mV");
     AT_send_reply();
     // MCU temperature.
-    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_TMCU_DEGREES, &generic_s32);
+    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_MCU_TEMPERATURE_DEGREES, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
-    AT_reply_add_string("Tmcu=");
+    AT_reply_add_string("mcu_temperature=");
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("dC");
     AT_send_reply();
     // Source voltage.
-    AT_reply_add_string("Vpv=");
-    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VPV_MV, &generic_s32);
+    AT_reply_add_string("source_voltage=");
+    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SOURCE_VOLTAGE_MV, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("mV");
     AT_send_reply();
     // Supercap voltage.
-    AT_reply_add_string("Vcap=");
-    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VCAP_MV, &generic_s32);
+    AT_reply_add_string("storage_voltage=");
+    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_STORAGE_VOLTAGE_MV, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("mV");
     AT_send_reply();
     // Light.
-    AT_reply_add_string("Light=");
-    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_LDR_PERCENT, &generic_s32);
+    AT_reply_add_string("sunshine_light=");
+    analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SUNSHINE_LIGHT_PERCENT, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("%");

@@ -51,21 +51,21 @@
 /*** SPSWS macros ***/
 
 // Timing.
-#define SPSWS_POWER_ON_DELAY_MS                         7000
-#define SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS           180
-#define SPSWS_GEOLOC_TIMEOUT_SECONDS                    120
+#define SPSWS_POWER_ON_DELAY_MS                                 7000
+#define SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS                   180
+#define SPSWS_GEOLOC_TIMEOUT_SECONDS                            120
 // Voltage hysteresis for radio.
-#define SPSWS_RADIO_OFF_VCAP_THRESHOLD_MV               1000
-#define SPSWS_RADIO_ON_VCAP_THRESHOLD_MV                1500
+#define SPSWS_RADIO_OFF_STORAGE_VOLTAGE_THRESHOLD_MV            1000
+#define SPSWS_RADIO_ON_STORAGE_VOLTAGE_THRESHOLD_MV             1500
 // Voltage hysteresis for uplink period.
-#define SPSWS_WEATHER_REQUEST_OFF_VCAP_THRESHOLD_MV     1500
-#define SPSWS_WEATHER_REQUEST_ON_VCAP_THRESHOLD_MV      2000
+#define SPSWS_WEATHER_REQUEST_OFF_STORAGE_VOLTAGE_THRESHOLD_MV  1500
+#define SPSWS_WEATHER_REQUEST_ON_STORAGE_VOLTAGE_THRESHOLD_MV   2000
 // Measurements buffers length.
-#define SPSWS_MEASUREMENT_PERIOD_SECONDS                60
-#define SPSWS_MEASUREMENT_BUFFER_SIZE                   (3600 / SPSWS_MEASUREMENT_PERIOD_SECONDS)
+#define SPSWS_MEASUREMENT_PERIOD_SECONDS                        60
+#define SPSWS_MEASUREMENT_BUFFER_SIZE                           (3600 / SPSWS_MEASUREMENT_PERIOD_SECONDS)
 #ifdef SPSWS_SEN15901_EMULATOR
-#define SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO      GPIO_DIO3
-#define SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO            GPIO_DIO4
+#define SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO              GPIO_DIO3
+#define SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO                    GPIO_DIO4
 #endif
 
 /*** SPSWS structures ***/
@@ -1022,45 +1022,45 @@ int main(void) {
             POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
             POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
             // MCU voltage.
-            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VMCU_MV, &generic_s32_1);
+            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_MCU_VOLTAGE_MV, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.mcu_voltage_mv), generic_s32_1);
             }
             // MCU temperature.
-            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_TMCU_DEGREES, &generic_s32_1);
+            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_MCU_TEMPERATURE_DEGREES, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.mcu_temperature_degrees), generic_s32_1);
             }
             // Solar cell voltage.
-            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VPV_MV, &generic_s32_1);
+            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SOURCE_VOLTAGE_MV, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.source_voltage_mv), generic_s32_1);
             }
             // Supercap voltage.
-            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_VCAP_MV, &generic_s32_1);
+            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_STORAGE_VOLTAGE_MV, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.storage_voltage_mv), generic_s32_1);
                 // Voltage hysteresis for radio.
-                if (generic_s32_1 < SPSWS_RADIO_OFF_VCAP_THRESHOLD_MV) {
+                if (generic_s32_1 < SPSWS_RADIO_OFF_STORAGE_VOLTAGE_THRESHOLD_MV) {
                     spsws_ctx.flags.radio_enabled = 0;
                 }
-                if (generic_s32_1 > SPSWS_RADIO_ON_VCAP_THRESHOLD_MV) {
+                if (generic_s32_1 > SPSWS_RADIO_ON_STORAGE_VOLTAGE_THRESHOLD_MV) {
                     spsws_ctx.flags.radio_enabled = 1;
                 }
                 // Voltage hysteresis for uplink period.
-                if (generic_s32_1 < SPSWS_WEATHER_REQUEST_OFF_VCAP_THRESHOLD_MV) {
+                if (generic_s32_1 < SPSWS_WEATHER_REQUEST_OFF_STORAGE_VOLTAGE_THRESHOLD_MV) {
                     spsws_ctx.flags.weather_request_enabled = 0;
                 }
-                if (generic_s32_1 > SPSWS_WEATHER_REQUEST_ON_VCAP_THRESHOLD_MV) {
+                if (generic_s32_1 > SPSWS_WEATHER_REQUEST_ON_STORAGE_VOLTAGE_THRESHOLD_MV) {
                     spsws_ctx.flags.weather_request_enabled = 1;
                 }
             }
             // Light sensor.
-            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_LDR_PERCENT, &generic_s32_1);
+            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SUNSHINE_LIGHT_PERCENT, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_light_percent), generic_s32_1);
