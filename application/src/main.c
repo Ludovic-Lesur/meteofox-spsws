@@ -64,7 +64,6 @@
 #define SPSWS_MEASUREMENT_PERIOD_SECONDS                        60
 #define SPSWS_MEASUREMENT_BUFFER_SIZE                           (3600 / SPSWS_MEASUREMENT_PERIOD_SECONDS)
 #ifdef SPSWS_SEN15901_EMULATOR
-#define SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO              GPIO_DIO3
 #define SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO                    GPIO_DIO4
 #endif
 
@@ -926,8 +925,7 @@ static void _SPSWS_init_hw(void) {
     // Init LED pin.
     GPIO_configure(&GPIO_LED, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 #ifdef SPSWS_SEN15901_EMULATOR
-    // Init SEN15901 emulator pins.
-    GPIO_configure(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+    // Init SEN15901 emulator synchronization pin.
     GPIO_configure(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 #endif
 }
@@ -1039,14 +1037,6 @@ int main(void) {
             if (analog_status == ANALOG_SUCCESS) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.source_voltage_mv), generic_s32_1);
             }
-#ifdef SPSWS_SEN15901_EMULATOR
-            if ((analog_status == ANALOG_SUCCESS) && (generic_s32_1 >= 5000)) {
-                GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 1);
-            }
-            else {
-                GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 0);
-            }
-#endif
             // Supercap voltage.
             analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_STORAGE_VOLTAGE_MV, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
@@ -1126,8 +1116,7 @@ int main(void) {
             _SPSWS_compute_final_measurements();
             _SPSWS_reset_measurements();
 #ifdef SPSWS_SEN15901_EMULATOR
-            // Latch battery charger and synchronize emulator on weather data message transmission.
-            GPIO_write(&SPSWS_SEN15901_EMULATOR_CHARGE_ENABLE_GPIO, 0);
+            // Synchronize emulator on weather data message transmission.
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 1);
 #endif
             // Send uplink weather message.
