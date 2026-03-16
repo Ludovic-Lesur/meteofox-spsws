@@ -117,8 +117,19 @@ errors:
 /*******************************************************************/
 NEOM8X_status_t NEOM8X_HW_set_backup_voltage(uint8_t state) {
     // Local variables.
-    NEOM8X_status_t status = NEOM8X_SUCCESS;
-    // Not implemented.
+    NEOM8X_status_t status = NEOM8X_ERROR_HW_FUNCTION_NOT_IMPLEMENTED;
+    /* To be implemented */
+    UNUSED(state);
+    return status;
+}
+#endif
+
+#ifdef NEOM8X_DRIVER_VBCKP_CONTROL
+/*******************************************************************/
+NEOM8X_status_t NEOM8X_HW_get_backup_voltage(uint8_t* state) {
+    // Local variables.
+    NEOM8X_status_t status = NEOM8X_ERROR_HW_FUNCTION_NOT_IMPLEMENTED;
+    /* To be implemented */
     UNUSED(state);
     return status;
 }
