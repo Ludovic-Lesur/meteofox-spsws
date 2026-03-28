@@ -9,6 +9,7 @@
 #define __POWER_H__
 
 #include "error.h"
+#include "gps.h"
 #include "lptim.h"
 #include "types.h"
 
@@ -16,7 +17,7 @@
 
 #define POWER_ON_DELAY_MS_MCU_TCXO      1000
 #define POWER_ON_DELAY_MS_ANALOG        100
-#define POWER_ON_DELAY_MS_GPS           1000
+#define POWER_ON_DELAY_MS_GPS           GPS_BOOT_TIME_MS
 #define POWER_ON_DELAY_MS_SENSORS       100
 #define POWER_ON_DELAY_MS_RADIO_TCXO    500
 #define POWER_ON_DELAY_MS_RADIO         100

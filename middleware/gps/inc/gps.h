@@ -12,6 +12,10 @@
 #include "neom8x.h"
 #include "types.h"
 
+/*** GPS macros ***/
+
+#define GPS_BOOT_TIME_MS    NEOM8X_BOOT_TIME_MS
+
 /*** GPS structures ***/
 
 /*!******************************************************************
