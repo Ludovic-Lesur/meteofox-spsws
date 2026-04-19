@@ -74,7 +74,7 @@
 
 /*******************************************************************/
 typedef enum {
-    SPSWS_STATE_STARTUP,
+    SPSWS_STATE_STARTUP = 0,
     SPSWS_STATE_MEASURE,
     SPSWS_STATE_WEATHER,
     SPSWS_STATE_MONITORING,
@@ -769,6 +769,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
 #endif
     // Library configuration.
     lib_config.rc = &sigfox_rc1_custom;
+    // Reload watchdog.
+    IWDG_reload();
     // Open library.
     sigfox_ep_api_status = SIGFOX_EP_API_open(&lib_config);
     SIGFOX_EP_API_check_status(0);

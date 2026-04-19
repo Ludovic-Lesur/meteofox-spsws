@@ -30,7 +30,7 @@
  *******************************************************************/
 typedef enum {
     // Driver errors.
-    POWER_SUCCESS,
+    POWER_SUCCESS = 0,
     POWER_ERROR_REQUESTER_ID,
     POWER_ERROR_DOMAIN,
     // Low level drivers errors.
