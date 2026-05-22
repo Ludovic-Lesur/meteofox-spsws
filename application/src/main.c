@@ -748,7 +748,6 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SIGFOX_EP_API_status_t sigfox_ep_api_status = SIGFOX_EP_API_SUCCESS;
     SIGFOX_EP_API_config_t lib_config;
     uint8_t status = 0;
-    SIGFOX_rc_t sigfox_rc1_custom;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     SIGFOX_EP_API_message_status_t message_status;
     SIGFOX_EP_dl_payload_t dl_payload;
@@ -756,19 +755,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
 #endif
     // Directly exit of the radio is disabled due to low supercap voltage.
     if (spsws_ctx.flags.radio_enabled == 0) goto errors;
-    // Build custom RC structure.
-    sigfox_rc1_custom.f_ul_hz = SIGFOX_RC1.f_ul_hz;
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-    sigfox_rc1_custom.f_dl_hz = SIGFOX_RC1.f_dl_hz;
-#endif
-    sigfox_rc1_custom.epsilon_hz = (SPSWS_SIGFOX_RC1_EPSILON_SNW_HZ + SPSWS_SIGFOX_RC1_EPSILON_EP_HZ);
-    sigfox_rc1_custom.spectrum_access = SIGFOX_RC1.spectrum_access;
-#ifdef SIGFOX_EP_PARAMETERS_CHECK
-    sigfox_rc1_custom.uplink_bit_rate_capability = SIGFOX_RC1.uplink_bit_rate_capability;
-    sigfox_rc1_custom.tx_power_dbm_eirp_max = SIGFOX_RC1.tx_power_dbm_eirp_max;
-#endif
     // Library configuration.
-    lib_config.rc = &sigfox_rc1_custom;
+    lib_config.rc = &SIGFOX_RC1;
     // Reload watchdog.
     IWDG_reload();
     // Open library.
