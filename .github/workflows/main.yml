@@ -22,10 +22,19 @@ jobs:
           fetch-depth: 0
           fetch-tags: 'true'
           
+      - name: Compute git-describe-like version from triggering tag
+        id: git_describe
+        uses: Ludovic-Lesur/actions/git-describe-from-action@master
+
       - name: Create version header file
         run: |
+          GIT_DESCRIBE_OVERRIDE="${{ steps.git_describe.outputs.git_version }}"
+          export GIT_DESCRIBE_OVERRIDE
+          echo "GIT_DESCRIBE_OVERRIDE=${GIT_DESCRIBE_OVERRIDE}"
           cd script/
           bash git_version.sh
+          echo "Generated version macros:"
+          grep '^#define' ../application/inc/version.h
 
       - name: Download CMake compilation flags files
         uses: actions/download-artifact@v7

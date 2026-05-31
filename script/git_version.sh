@@ -18,7 +18,13 @@ touch $version_file
 date=`date -R`
 
 # Execute git commands.
-git_version=`git describe --long --always`
+if [[ -n "$GIT_DESCRIBE_OVERRIDE" ]]; then
+    echo "[git_version.sh] Using GIT_DESCRIBE_OVERRIDE: $GIT_DESCRIBE_OVERRIDE"
+    git_version="$GIT_DESCRIBE_OVERRIDE"
+else
+    echo "[git_version.sh] Using git describe"
+    git_version=`git describe --long --always`
+fi
 diff=`git diff ':(exclude)../application/inc/spsws_flags.h' ':(exclude)../script'`
 
 # Extract fields
