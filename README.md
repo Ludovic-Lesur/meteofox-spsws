@@ -83,12 +83,12 @@ make all
 
 * **Build** the desired version (with IDE or `cmake`) or **download** a specific [firmware release](https://github.com/Ludovic-Lesur/meteofox-spsws/releases) (expand the `Assets` menu, download the corresponding artifact and extract the binary files from the `zip`).
 * **Open the main enclosure** of the weather station.
-* Connect the flashing tool to the **P3 connector** located in the center of the PCB (standard SWD pinout).
+* Connect the flashing tool to the **P6** (HW1.0) or **P3** (HW2.0) **connector** located in the center of the PCB (standard SWD pinout).
 
 ### ST-Link on Nucleo board
 
 * Make sure that the ST-LINK/NUCLEO jumpers (generally designated by **CN2**) are not fitted, in order to **select the external programming connector** instead of the internal MCU.
-* An **MSC disk** named `NODE_XXXXXX` should be mounted by the system after USB plugging. If not, follow the ST-Link probe procedure thereafter.
+* An **MSC disk** named `NODE_XXXXXX` should be mounted by the system after USB plugging. If not, download the [ST Cube Programmer](https://www.st.com/en/development-tools/stm32cubeprog.html) software which will install the required drivers. If the MSC disk is still not mounted, follow the ST-Link probe procedure thereafter.
 * **Copy/paste** or **click/drop** the `bin` file into the disk.
 
 ### ST-Link probe
@@ -105,7 +105,7 @@ make all
 
 * Download the [Segger J-Link](https://www.segger.com/downloads/jlink/) software.
 * Launch the `JFlashLite` tool.
-* Set target device to **STM32L081CB**, target interface to **SWD**, speed to **4000kHz** and click `OK`.
+* Set target device to **STM32L041K6** (HW1.0) or **STM32L081CB** (HW2.0), target interface to **SWD**, speed to **4000kHz** and click `OK`.
 * Open the `hex` file to flash.
 * Click on the `Program Device` button.
 
