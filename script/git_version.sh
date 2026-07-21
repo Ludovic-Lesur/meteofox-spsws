@@ -1,9 +1,27 @@
 #!/bin/bash
 
-sscanf() {
+# Function to parse version and extract components into named variables
+parse_git_version() {
     local str="$1"
-    local format="$2"
-    [[ "$str" =~ $format ]]
+    # Try to match the field version format first: sw.X.Y.Z.f-<commits>-g<hash>
+    if [[ "$str" =~ ^sw([0-9]+)\.([0-9]+)\.([0-9]+)\.f-([0-9]+)-g([a-f0-9]+) ]]; then
+        version_major="${BASH_REMATCH[1]}"
+        version_minor="${BASH_REMATCH[2]}"
+        version_patch="${BASH_REMATCH[3]}"
+        commit_index="${BASH_REMATCH[4]}"
+        commit_id="${BASH_REMATCH[5]}"
+        return 0
+    fi
+    # Fallback to standard version format: sw.X.Y-<commits>-g<hash>
+    if [[ "$str" =~ ^sw([0-9]+)\.([0-9]+)-([0-9]+)-g([a-f0-9]+) ]]; then
+        version_major="${BASH_REMATCH[1]}"
+        version_minor="${BASH_REMATCH[2]}"
+        version_patch="0"
+        commit_index="${BASH_REMATCH[3]}"
+        commit_id="${BASH_REMATCH[4]}"
+        return 0
+    fi
+    return 1
 }
 
 # Files location.
@@ -28,7 +46,11 @@ fi
 diff=`git diff ':(exclude)../application/inc/spsws_flags.h' ':(exclude)../script'`
 
 # Extract fields
-sscanf $git_version "sw([0-9]+).([0-9]+)-([0-9]+)-g(.+)"
+parse_git_version "$git_version"
+if [[ $? -ne 0 ]]; then
+    echo "[git_version.sh] Warning: could not parse version $git_version"
+    exit 1
+fi
 
 # Manage dirty flag.
 dirty_flag=0
@@ -47,10 +69,10 @@ echo "#ifndef __VERSION_H__" >> $version_file
 echo "#define __VERSION_H__" >> $version_file
 echo "" >> $version_file
 echo "#define GIT_VERSION       \"$git_version\"" >> $version_file
-echo "#define GIT_MAJOR_VERSION ${BASH_REMATCH[1]}" >> $version_file
-echo "#define GIT_MINOR_VERSION ${BASH_REMATCH[2]}" >> $version_file
-echo "#define GIT_COMMIT_INDEX  ${BASH_REMATCH[3]}" >> $version_file
-echo "#define GIT_COMMIT_ID     0x${BASH_REMATCH[4]}" >> $version_file
+echo "#define GIT_MAJOR_VERSION $version_major" >> $version_file
+echo "#define GIT_MINOR_VERSION $version_minor" >> $version_file
+echo "#define GIT_COMMIT_INDEX  $commit_index" >> $version_file
+echo "#define GIT_COMMIT_ID     0x$commit_id" >> $version_file
 echo "#define GIT_DIRTY_FLAG    $dirty_flag" >> $version_file
 echo "" >> $version_file
 echo "#endif /* __VERSION_H__ */" >> $version_file
