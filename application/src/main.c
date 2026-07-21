@@ -752,6 +752,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SIGFOX_EP_API_message_status_t message_status;
     SIGFOX_EP_dl_payload_t dl_payload;
     int16_t dl_rssi = 0;
+    RTC_status_t rtc_status = RTC_SUCCESS;
+    RTC_time_t rtc_time;
 #endif
     // Directly exit of the radio is disabled due to low supercap voltage.
     if (spsws_ctx.flags.radio_enabled == 0) goto errors;
@@ -792,6 +794,18 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                 case SIGFOX_EP_DL_OP_CODE_SET_WEATHER_DATA_PERIOD:
                     // Check and store new configuration.
                     _SPSWS_store_weather_data_period(dl_payload.set_weather_data_period.weather_data_period);
+                    break;
+                case SIGFOX_EP_DL_OP_CODE_SET_DATE_TIME:
+                    // Update RTC time.
+                    rtc_time.year = dl_payload.set_date_time.year;
+                    rtc_time.month = dl_payload.set_date_time.month;
+                    rtc_time.date = dl_payload.set_date_time.date;
+                    rtc_time.hours = dl_payload.set_date_time.hours;
+                    rtc_time.minutes = dl_payload.set_date_time.minutes;
+                    rtc_time.seconds = dl_payload.set_date_time.seconds;
+                    // Update RTC registers.
+                    rtc_status = RTC_set_time(&rtc_time);
+                    RTC_stack_error(ERROR_BASE_RTC);
                     break;
                 default:
                     ERROR_stack_add(ERROR_DL_OP_CODE);

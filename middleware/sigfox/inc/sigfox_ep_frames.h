@@ -151,6 +151,7 @@ typedef enum {
     SIGFOX_EP_DL_OP_CODE_NOP = 0,
     SIGFOX_EP_DL_OP_CODE_RESET,
     SIGFOX_EP_DL_OP_CODE_SET_WEATHER_DATA_PERIOD,
+    SIGFOX_EP_DL_OP_CODE_SET_DATE_TIME,
     SIGFOX_EP_DL_OP_CODE_LAST
 } SIGFOX_EP_dl_op_code_t;
 #endif
@@ -187,6 +188,14 @@ typedef union {
                 unsigned unused1 :16;
                 unsigned unused2 :16;
             } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) set_weather_data_period;
+            struct {
+                unsigned year :16;
+                unsigned month :8;
+                unsigned date :8;
+                unsigned hours :8;
+                unsigned minutes :8;
+                unsigned seconds :8;
+            } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) set_date_time;
         };
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SIGFOX_EP_dl_payload_t;
