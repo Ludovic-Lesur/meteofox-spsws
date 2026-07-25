@@ -743,6 +743,27 @@ static void _SPSWS_update_nvm_data(SPSWS_nvm_data_t timestamp_type) {
 
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
+static void _SPSWS_set_date_time(RTC_time_t* rtc_time) {
+    // Local variables.
+    RTC_status_t rtc_status = RTC_SUCCESS;
+    // Update RTC registers.
+    rtc_status = RTC_set_time(rtc_time);
+    RTC_stack_error(ERROR_BASE_RTC);
+    // Update status bit.
+    if (rtc_status == RTC_SUCCESS) {
+        // Update timestamp in case of first calibration.
+        if (spsws_ctx.status.first_rtc_calibration == 0) {
+            _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_WAKE_UP);
+        }
+        // Update status.
+        spsws_ctx.status.first_rtc_calibration = 1;
+        spsws_ctx.status.daily_rtc_calibration = 1;
+    }
+}
+#endif
+
+#ifndef SPSWS_MODE_CLI
+/*******************************************************************/
 static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* application_message) {
     // Local variables.
     SIGFOX_EP_API_status_t sigfox_ep_api_status = SIGFOX_EP_API_SUCCESS;
@@ -752,7 +773,6 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SIGFOX_EP_API_message_status_t message_status;
     SIGFOX_EP_dl_payload_t dl_payload;
     int16_t dl_rssi = 0;
-    RTC_status_t rtc_status = RTC_SUCCESS;
     RTC_time_t rtc_time;
 #endif
     // Directly exit of the radio is disabled due to low supercap voltage.
@@ -803,9 +823,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     rtc_time.hours = dl_payload.set_date_time.hours;
                     rtc_time.minutes = dl_payload.set_date_time.minutes;
                     rtc_time.seconds = dl_payload.set_date_time.seconds;
-                    // Update RTC registers.
-                    rtc_status = RTC_set_time(&rtc_time);
-                    RTC_stack_error(ERROR_BASE_RTC);
+                    // Update RTC.
+                    _SPSWS_set_date_time(&rtc_time);
                     break;
                 default:
                     ERROR_stack_add(ERROR_DL_OP_CODE);
@@ -956,7 +975,6 @@ static void _SPSWS_init_hw(void) {
 int main(void) {
     // Local variables.
     RCC_status_t rcc_status = RCC_SUCCESS;
-    RTC_status_t rtc_status = RTC_SUCCESS;
     LPTIM_status_t lptim_status = LPTIM_SUCCESS;
     ANALOG_status_t analog_status = ANALOG_SUCCESS;
     GPS_status_t gps_status = GPS_SUCCESS;
@@ -1282,19 +1300,8 @@ int main(void) {
                     rtc_time.hours = gps_time.hours;
                     rtc_time.minutes = gps_time.minutes;
                     rtc_time.seconds = gps_time.seconds;
-                    // Update RTC registers.
-                    rtc_status = RTC_set_time(&rtc_time);
-                    RTC_stack_error(ERROR_BASE_RTC);
-                    // Update status bit.
-                    if (rtc_status == RTC_SUCCESS) {
-                        // Update timestamp in case of first calibration.
-                        if (spsws_ctx.status.first_rtc_calibration == 0) {
-                            _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_WAKE_UP);
-                        }
-                        // Update status.
-                        spsws_ctx.status.first_rtc_calibration = 1;
-                        spsws_ctx.status.daily_rtc_calibration = 1;
-                    }
+                    // Update RTC.
+                    _SPSWS_set_date_time(&rtc_time);
                 }
                 if (por_flag != 0) {
                     // In POR condition, RTC alarm will occur during the first GPS time acquisition because of the RTC reset and the random delay.
