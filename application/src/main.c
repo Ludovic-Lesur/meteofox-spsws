@@ -1323,10 +1323,7 @@ int main(void) {
             // Switch to internal clock.
             _SPSWS_set_clock(0);
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-#ifdef SPSWS_WIND_VANE_ULTIMETER
-            ultimeter_status = ULTIMETER_set_wind_measurement(1);
-            ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
-#else
+#ifndef SPSWS_WIND_VANE_ULTIMETER
             sen15901_status = SEN15901_set_wind_measurement(1);
             SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
@@ -1404,10 +1401,7 @@ int main(void) {
                 // Check hour change flag.
                 if (spsws_ctx.flags.valid_wakeup != 0) {
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-#ifdef SPSWS_WIND_VANE_ULTIMETER
-                    ultimeter_status = ULTIMETER_set_wind_measurement(0);
-                    ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
-#else
+#ifndef SPSWS_WIND_VANE_ULTIMETER
                     sen15901_status = SEN15901_set_wind_measurement(0);
                     SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
@@ -1429,6 +1423,11 @@ int main(void) {
                 // Compute next state
                 spsws_ctx.state = SPSWS_STATE_MEASURE;
             }
+#ifdef SPSWS_WIND_VANE_ULTIMETER
+            // Measurements must be stopped on any wake-up in order to have the LPTIM available.
+            ultimeter_status = ULTIMETER_set_wind_measurement((spsws_ctx.state == SPSWS_STATE_SLEEP) ? 1 : 0);
+            ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
+#endif
             break;
         case SPSWS_STATE_SLEEP:
 #ifdef SIGFOX_EP_BIDIRECTIONAL
