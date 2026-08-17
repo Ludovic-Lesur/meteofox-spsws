@@ -216,7 +216,7 @@ static void _SPSWS_tick_second_callback(void) {
 }
 #endif
 
-#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_WIND_VANE_ULTIMETER) && !(defined SPSWS_MODE_CLI))
 /*******************************************************************/
 static void _SPSWS_sen15901_process_callback(void) {
     // Update local flag.
@@ -224,7 +224,7 @@ static void _SPSWS_sen15901_process_callback(void) {
 }
 #endif
 
-#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && (defined SPSWS_WIND_VANE_ULTIMETER))
+#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && (defined SPSWS_WIND_VANE_ULTIMETER) && !(defined SPSWS_MODE_CLI))
 /*******************************************************************/
 static void _SPSWS_ultimeter_process_callback(void) {
     // Update local flag.
@@ -952,11 +952,14 @@ static void _SPSWS_init_hw(void) {
     LPTIM_stack_error(ERROR_BASE_LPTIM);
 #if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
     // Init wind vane and rainfall driver.
-    sen15901_status = SEN15901_init(&_SPSWS_sen15901_process_callback);
-    SEN15901_stack_error(ERROR_BASE_SEN15901);
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ultimeter_status = ULTIMETER_init(&_SPSWS_ultimeter_process_callback);
     ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
+    sen15901_status = SEN15901_init();
+    SEN15901_stack_error(ERROR_BASE_SEN15901);
+#else
+    sen15901_status = SEN15901_init(&_SPSWS_sen15901_process_callback);
+    SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
     SENSORS_HW_get_wind_tick_second_callback(&spsws_ctx.wind_tick_second_callback);
 #endif
