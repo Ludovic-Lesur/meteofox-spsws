@@ -360,7 +360,7 @@ static void _SPSWS_compute_final_measurements(void) {
     sample_count = (spsws_ctx.measurements.humidity_ambiant_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.humidity_ambiant_percent.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.humidity_ambiant_percent.sample_buffer, sample_count, 0, &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.humidity_ambiant_percent.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             spsws_ctx.sigfox_ep_ul_payload_weather.humidity_percent = (uint8_t) generic_s32_1;
@@ -371,7 +371,7 @@ static void _SPSWS_compute_final_measurements(void) {
     sample_count = (spsws_ctx.measurements.sunshine_light_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.sunshine_light_percent.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.sunshine_light_percent.sample_buffer, sample_count, 0, &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.sunshine_light_percent.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_light_percent = (uint8_t) generic_s32_1;
@@ -397,7 +397,7 @@ static void _SPSWS_compute_final_measurements(void) {
     sample_count = (spsws_ctx.measurements.pressure_atmospheric_absolute_pa.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.pressure_atmospheric_absolute_pa.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.pressure_atmospheric_absolute_pa.sample_buffer, sample_count, 0, &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.pressure_atmospheric_absolute_pa.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             spsws_ctx.sigfox_ep_ul_payload_weather.pressure_atmospheric_absolute_tenth_hpa = (uint16_t) (generic_s32_1 / 10);
@@ -424,7 +424,7 @@ static void _SPSWS_compute_final_measurements(void) {
     sample_count = (spsws_ctx.measurements.humidity_pcb_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.humidity_pcb_percent.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.humidity_pcb_percent.sample_buffer, sample_count, 0, &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.humidity_pcb_percent.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             spsws_ctx.sigfox_ep_ul_payload_monitoring.humidity_percent = (uint8_t) generic_s32_1;
@@ -435,7 +435,7 @@ static void _SPSWS_compute_final_measurements(void) {
     sample_count = (spsws_ctx.measurements.source_voltage_mv.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.source_voltage_mv.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.source_voltage_mv.sample_buffer, sample_count, 0, &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.source_voltage_mv.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             spsws_ctx.sigfox_ep_ul_payload_monitoring.source_voltage_ten_mv = (uint16_t) (generic_s32_1 / 10);
@@ -453,7 +453,7 @@ static void _SPSWS_compute_final_measurements(void) {
     sample_count = (spsws_ctx.measurements.mcu_voltage_mv.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.mcu_voltage_mv.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.mcu_voltage_mv.sample_buffer, sample_count, 0, &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.mcu_voltage_mv.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             spsws_ctx.sigfox_ep_ul_payload_monitoring.mcu_voltage_mv = (uint16_t) generic_s32_1;
