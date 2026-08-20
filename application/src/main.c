@@ -1404,12 +1404,13 @@ int main(void) {
                 // Check hour change flag.
                 if (spsws_ctx.flags.valid_wakeup != 0) {
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-#ifndef SPSWS_WIND_VANE_ULTIMETER
+#ifdef SPSWS_WIND_VANE_ULTIMETER
+                    ultimeter_status = ULTIMETER_set_wind_measurement(0);
+                    ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
+#else
                     sen15901_status = SEN15901_set_wind_measurement(0);
                     SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
-                    ultimeter_status = ULTIMETER_set_wind_measurement(0);
-                    ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
                     sen15901_status = SEN15901_set_rainfall_measurement(0);
                     SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
