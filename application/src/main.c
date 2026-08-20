@@ -1408,6 +1408,8 @@ int main(void) {
                     sen15901_status = SEN15901_set_wind_measurement(0);
                     SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif
+                    ultimeter_status = ULTIMETER_set_wind_measurement(0);
+                    ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
                     sen15901_status = SEN15901_set_rainfall_measurement(0);
                     SEN15901_stack_error(ERROR_BASE_SEN15901);
 #endif

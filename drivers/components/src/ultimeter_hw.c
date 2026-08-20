@@ -34,10 +34,11 @@
 ULTIMETER_status_t ULTIMETER_HW_init(ULTIMETER_HW_configuration_t* configuration) {
     // Local variables.
     ULTIMETER_status_t status = ULTIMETER_SUCCESS;
+    // Note: the most accurate configuration is: screw facing the south, pull-up resistors on both signals and using the rising edges.
     // Init wind speed GPIO.
-    EXTI_configure_gpio(&ULTIMETER_HW_GPIO_WIND_SPEED, GPIO_PULL_NONE, EXTI_TRIGGER_FALLING_EDGE, (configuration->wind_speed_edge_irq_callback), NVIC_PRIORITY_WIND_SPEED);
+    EXTI_configure_gpio(&ULTIMETER_HW_GPIO_WIND_SPEED, GPIO_PULL_NONE, EXTI_TRIGGER_RISING_EDGE, (configuration->wind_speed_edge_irq_callback), NVIC_PRIORITY_WIND_SPEED);
     // Init wind direction GPIO.
-    EXTI_configure_gpio(&ULTIMETER_HW_GPIO_WIND_DIRECTION, GPIO_PULL_NONE, EXTI_TRIGGER_FALLING_EDGE, (configuration->wind_direction_edge_irq_callback), NVIC_PRIORITY_WIND_DIRECTION);
+    EXTI_configure_gpio(&ULTIMETER_HW_GPIO_WIND_DIRECTION, GPIO_PULL_NONE, EXTI_TRIGGER_RISING_EDGE, (configuration->wind_direction_edge_irq_callback), NVIC_PRIORITY_WIND_DIRECTION);
     // Store tick second callback which will be used in main (RTC).
     SENSORS_HW_set_wind_tick_second_callback(configuration->tick_second_irq_callback);
     return status;
