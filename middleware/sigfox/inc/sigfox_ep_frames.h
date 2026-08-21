@@ -16,31 +16,37 @@
 /*** SIGFOX EP FRAMES macros ***/
 
 // Uplink payload sizes.
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_STARTUP           8
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK       12
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_STARTUP                       8
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK                   10
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER           10
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER                       12
 #else
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER           6
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER                       7
 #endif
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_MONITORING        9
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC            11
-#define SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC_TIMEOUT    2
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_MONITORING                    9
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC                        11
+#define SIGFOX_EP_UL_PAYLOAD_SIZE_GEOLOC_TIMEOUT                2
 // Error values.
-#define SIGFOX_EP_ERROR_VALUE_TEMPERATURE           0x7FF
-#define SIGFOX_EP_ERROR_VALUE_HUMIDITY              0xFF
-#define SIGFOX_EP_ERROR_VALUE_SUNSHINE_LIGHT        0xFF
-#define SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX     0xF
-#define SIGFOX_EP_ERROR_VALUE_PRESSURE              0xFFFF
-#define SIGFOX_EP_ERROR_VALUE_WIND                  0xFF
-#define SIGFOX_EP_ERROR_VALUE_RAIN                  0xFF
-#define SIGFOX_EP_ERROR_VALUE_SOURCE_VOLTAGE        0xFFF
-#define SIGFOX_EP_ERROR_VALUE_STORAGE_VOLTAGE       0xFFF
-#define SIGFOX_EP_ERROR_VALUE_MCU_TEMPERATURE       0x7F
-#define SIGFOX_EP_ERROR_VALUE_MCU_VOLTAGE           0xFFF
-// Rainfall unit threshold.
-#define SIGFOX_EP_RAINFALL_MAX_UM                   126000
-#define SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM        12700
+#define SIGFOX_EP_ERROR_VALUE_TEMPERATURE                       0x7FF
+#define SIGFOX_EP_ERROR_VALUE_HUMIDITY                          0x7F
+#define SIGFOX_EP_ERROR_VALUE_SUNSHINE_LIGHT                    0xFFFF
+#define SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX                 0x7F
+#define SIGFOX_EP_ERROR_VALUE_PRESSURE                          0x3FFF
+#define SIGFOX_EP_ERROR_VALUE_WIND_SPEED                        0x7FF
+#define SIGFOX_EP_ERROR_VALUE_WIND_DIRECTION                    0x1FF
+#define SIGFOX_EP_ERROR_VALUE_RAINFALL                          0x1FF
+#define SIGFOX_EP_ERROR_VALUE_SOURCE_VOLTAGE                    0xFFF
+#define SIGFOX_EP_ERROR_VALUE_STORAGE_VOLTAGE                   0xFFF
+#define SIGFOX_EP_ERROR_VALUE_MCU_TEMPERATURE                   0x7F
+#define SIGFOX_EP_ERROR_VALUE_MCU_VOLTAGE                       0xFFF
+// Sunshine light representation.
+#define SIGFOX_EP_SHUNSHINE_LIGHT_MAX_MLUX                      163820000
+#define SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_HIGH_MLUX      16383000
+#define SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_MIDDLE_MLUX    1638300
+#define SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_LOW_MLUX       163830
+// Rainfall representation.
+#define SIGFOX_EP_RAINFALL_MAX_UM                               254000
+#define SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM                    25500
 
 /*** SIGFOX EP FRAMES structures ***/
 
@@ -60,35 +66,67 @@ typedef union {
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SIGFOX_EP_ul_payload_startup_t;
 
-/*******************************************************************/
+/*!******************************************************************
+ * \struct SIGFOX_EP_ul_payload_rainfall_unit_t
+ * \brief Sigfox uplink sunshine light unit format.
+ *******************************************************************/
+typedef enum {
+    SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_HUNDREDTH_LUX = 0b00,
+    SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TENTH_LUX = 0b01,
+    SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_LUX = 0b10,
+    SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TEN_LUX = 0b11
+} SIGFOX_EP_ul_payload_sunshine_light_unit_t;
+
+/*!******************************************************************
+ * \struct SIGFOX_EP_ul_payload_sunshine_light_t
+ * \brief Sigfox uplink sunshine light field format.
+ *******************************************************************/
+typedef union {
+    uint16_t all;
+    struct {
+        unsigned value: 14;
+        SIGFOX_EP_ul_payload_sunshine_light_unit_t unit :2;
+    } __attribute__((scalar_storage_order("little-endian"))) __attribute__((packed));
+} SIGFOX_EP_ul_payload_sunshine_light_t;
+
+/*!******************************************************************
+ * \struct SIGFOX_EP_ul_payload_rainfall_unit_t
+ * \brief Sigfox uplink rainfall unit format.
+ *******************************************************************/
 typedef enum {
     SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_TENTH_MM = 0b0,
     SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM = 0b1
 } SIGFOX_EP_ul_payload_rainfall_unit_t;
 
-/*******************************************************************/
+/*!******************************************************************
+ * \struct SIGFOX_EP_ul_payload_rainfall_t
+ * \brief Sigfox uplink rainfall field format.
+ *******************************************************************/
 typedef union {
-    uint8_t all;
+    uint16_t all;
     struct {
-        unsigned value: 7;
+        unsigned value: 8;
         SIGFOX_EP_ul_payload_rainfall_unit_t unit :1;
     } __attribute__((scalar_storage_order("little-endian"))) __attribute__((packed));
 } SIGFOX_EP_ul_payload_rainfall_t;
 
-/*******************************************************************/
+/*!******************************************************************
+ * \struct SPSWS_EP_ul_payload_weather_t
+ * \brief Sigfox uplink weather frame format.
+ *******************************************************************/
 typedef union {
     uint8_t frame[SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER];
     struct {
-        unsigned temperature_tenth_degrees :12;
-        unsigned humidity_percent :8;
-        unsigned sunshine_light_percent :8;
-        unsigned sunshine_uv_index :4;
-        unsigned pressure_atmospheric_absolute_tenth_hpa :16;
+        unsigned temperature_tenth_degrees :12;                 // [-204.7 to 204.6°C / 0.1°C]
+        unsigned humidity_percent :7;                           // [0 to 126% / 1%]
+        unsigned sunshine_light :16;                            // [0.00 to 163.84lux / 0.01lux] + [0.0 to 1638.4lux / 0.1lux] + [0 to 16384lux / 1lux] + [0 to 163830lux / 10lux]
+        unsigned sunshine_uv_index_duvi :7;                     // [0.0 to 12.6UVI / 0.1UVI]
+        unsigned pressure_atmospheric_absolute_tenth_hpa :14;   // [0.0 to 1638.2hPa / 0.1hPa]
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-        unsigned wind_speed_average_kmh :8;
-        unsigned wind_speed_peak_kmh :8;
-        unsigned wind_direction_average_two_degrees :8;
-        unsigned rainfall :8;
+        unsigned wind_speed_average_tenth_kmh :11;              // [0.0 to 204.6km/h / 0.1km/h]
+        unsigned wind_speed_peak_tenth_kmh :11;                 // [0.0 to 204.6km/h / 0.1km/h]
+        unsigned wind_direction_average_degrees :9;             // [0.0 to 360d / 1d]
+        unsigned rainfall :9;                                   // [0.0 to 25.5mm / 0.1mm] + [0 to 254mm / 1mm]
 #endif
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_EP_ul_payload_weather_t;
