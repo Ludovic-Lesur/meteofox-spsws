@@ -119,7 +119,7 @@ typedef union {
     struct {
         unsigned temperature_tenth_degrees :12;                 // [-204.7 to 204.6°C / 0.1°C]
         unsigned humidity_percent :7;                           // [0 to 126% / 1%]
-        unsigned sunshine_light :16;                            // [0.00 to 163.84lux / 0.01lux] + [0.0 to 1638.4lux / 0.1lux] + [0 to 16384lux / 1lux] + [0 to 163830lux / 10lux]
+        unsigned sunshine_light :16;                            // [0.00 to 163.83lux / 0.01lux] + [0.0 to 1638.3lux / 0.1lux] + [0 to 16383lux / 1lux] + [0 to 163820lux / 10lux]
         unsigned sunshine_uv_index_duvi :7;                     // [0.0 to 12.6UVI / 0.1UVI]
         unsigned pressure_atmospheric_absolute_tenth_hpa :14;   // [0.0 to 1638.2hPa / 0.1hPa]
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
