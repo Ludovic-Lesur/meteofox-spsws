@@ -278,7 +278,7 @@ static AT_status_t _CLI_rcc_callback(void) {
         AT_reply_add_string((clock_status == 0) ? ":OFF:" : ":ON:");
         AT_reply_add_integer((int32_t) clock_frequency, STRING_FORMAT_DECIMAL, 0);
         AT_reply_add_string("Hz");
-        AT_send_reply();
+        AT_reply_send();
     }
 errors:
     return status;
@@ -297,7 +297,7 @@ static AT_status_t _CLI_get_ep_id_callback(void) {
         _CLI_check_driver_status(nvm_status, NVM_SUCCESS, ERROR_BASE_NVM);
         AT_reply_add_integer(id_byte, STRING_FORMAT_HEXADECIMAL, 0);
     }
-    AT_send_reply();
+    AT_reply_send();
 errors:
     return status;
 }
@@ -336,7 +336,7 @@ static AT_status_t _CLI_get_ep_key_callback(void) {
         _CLI_check_driver_status(nvm_status, NVM_SUCCESS, ERROR_BASE_NVM);
         AT_reply_add_integer(key_byte, STRING_FORMAT_HEXADECIMAL, 0);
     }
-    AT_send_reply();
+    AT_reply_send();
 errors:
     return status;
 }
@@ -377,35 +377,35 @@ static AT_status_t _CLI_adc_callback(void) {
     AT_reply_add_string("mcu_voltage=");
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("mV");
-    AT_send_reply();
+    AT_reply_send();
     // MCU temperature.
     analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_MCU_TEMPERATURE_DEGREES, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_string("mcu_temperature=");
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("dC");
-    AT_send_reply();
+    AT_reply_send();
     // Source voltage.
     AT_reply_add_string("source_voltage=");
     analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SOURCE_VOLTAGE_MV, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("mV");
-    AT_send_reply();
+    AT_reply_send();
     // Supercap voltage.
     AT_reply_add_string("storage_voltage=");
     analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_STORAGE_VOLTAGE_MV, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("mV");
-    AT_send_reply();
+    AT_reply_send();
     // Light.
     AT_reply_add_string("sunshine_light=");
     analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SUNSHINE_LIGHT_PERCENT, &generic_s32);
     _CLI_check_driver_status(analog_status, ANALOG_SUCCESS, ERROR_BASE_ANALOG);
     AT_reply_add_integer(generic_s32, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("%");
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_ANALOG);
@@ -431,12 +431,12 @@ static AT_status_t _CLI_iths_callback(void) {
     AT_reply_add_string("Tpcb=");
     AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
-    AT_send_reply();
+    AT_reply_send();
     // Humidity.
     AT_reply_add_string("Hpcb=");
     AT_reply_add_integer(humidity_percent, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("%");
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
@@ -462,12 +462,12 @@ static AT_status_t _CLI_eths_callback(void) {
     AT_reply_add_string("Tamb=");
     AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
-    AT_send_reply();
+    AT_reply_send();
     // Humidity.
     AT_reply_add_string("Hamb=");
     AT_reply_add_integer(humidity_percent, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("%");
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
@@ -492,13 +492,13 @@ static AT_status_t _CLI_epts_callback(void) {
     AT_reply_add_string("Pabs=");
     AT_reply_add_integer(pressure_pa, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("Pa");
-    AT_send_reply();
+    AT_reply_send();
     // Temperature.
     STRING_integer_to_floating_decimal_string(temperature_tenth_degrees, 1, (CLI_TEMPERATURE_STRING_SIZE - 1), (char_t*) temperature_str);
     AT_reply_add_string("Tamb=");
     AT_reply_add_string(temperature_str);
     AT_reply_add_string("dC");
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
@@ -518,7 +518,7 @@ static AT_status_t _CLI_euvs_callback(void) {
     // Read and print data.
     AT_reply_add_string("UVI=");
     AT_reply_add_integer(uv_index, STRING_FORMAT_DECIMAL, 0);
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
     return status;
@@ -583,7 +583,7 @@ static AT_status_t _CLI_time_callback(void) {
     }
     AT_reply_add_integer((int32_t) fix_duration_seconds, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("s");
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_GPS);
     return status;
@@ -636,7 +636,7 @@ static AT_status_t _CLI_gps_callback(void) {
     }
     AT_reply_add_integer((int32_t) fix_duration_seconds, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("s");
-    AT_send_reply();
+    AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_GPS);
     return status;
@@ -655,7 +655,7 @@ static void _CLI_print_dl_payload(sfx_u8* dl_payload, sfx_u8 dl_payload_size, sf
     AT_reply_add_string(":");
     AT_reply_add_integer(rssi_dbm, STRING_FORMAT_DECIMAL, 0);
     AT_reply_add_string("dBm");
-    AT_send_reply();
+    AT_reply_send();
 }
 #endif
 
@@ -673,7 +673,7 @@ static AT_status_t _CLI_read_print_dl_payload(void) {
     // Check downlink status.
     if (message_status.field.dl_frame == 0) {
         AT_reply_add_string("+RX=timeout");
-        AT_send_reply();
+        AT_reply_send();
     }
     else {
         // Read downlink payload.
@@ -992,7 +992,7 @@ static AT_status_t _CLI_rssi_callback(void) {
         // Print RSSI.
         AT_reply_add_integer(rssi_dbm, STRING_FORMAT_DECIMAL, 0);
         AT_reply_add_string("dBm");
-        AT_send_reply();
+        AT_reply_send();
         // Report delay.
         lptim_status = LPTIM_delay_milliseconds(CLI_RSSI_REPORT_PERIOD_MS, LPTIM_DELAY_MODE_ACTIVE);
         _CLI_check_driver_status(lptim_status, LPTIM_SUCCESS, ERROR_BASE_LPTIM);
