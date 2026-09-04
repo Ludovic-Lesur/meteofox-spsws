@@ -78,7 +78,7 @@ ULTIMETER_status_t ULTIMETER_HW_timer_start(void) {
     ULTIMETER_status_t status = ULTIMETER_SUCCESS;
     LPTIM_status_t lptim_status = LPTIM_SUCCESS;
     // Start timer.
-    lptim_status = LPTIM_start(LPTIM_CLOCK_PRESCALER_4);
+    lptim_status = LPTIM_start(LPTIM_CLOCK_PRESCALER_16);
     LPTIM_exit_error(ULTIMETER_ERROR_BASE_TIMER);
 errors:
     return status;
@@ -92,7 +92,6 @@ ULTIMETER_status_t ULTIMETER_HW_timer_stop(void) {
     // Stop timer.
     lptim_status = LPTIM_stop();
     LPTIM_stack_error(ERROR_BASE_ULTIMETER + ULTIMETER_ERROR_BASE_TIMER);
-    /* To be implemented */
     return status;
 }
 /*******************************************************************/

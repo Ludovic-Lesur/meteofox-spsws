@@ -97,7 +97,7 @@ typedef union {
         unsigned first_rtc_calibration :1;
         unsigned lse_status :1;
         unsigned lsi_status :1;
-        unsigned mcu_clock_source :1;
+        unsigned hse_status :1;
         unsigned station_mode :1;
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_status_t;
@@ -106,7 +106,6 @@ typedef union {
 typedef union {
     uint16_t all;
     struct {
-        unsigned ultimeter_process :1;
         unsigned sen15901_process :1;
         unsigned radio_enabled : 1;
         unsigned reset_request : 1;
@@ -224,14 +223,6 @@ static void _SPSWS_sen15901_process_callback(void) {
 }
 #endif
 
-#if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && (defined SPSWS_WIND_VANE_ULTIMETER) && !(defined SPSWS_MODE_CLI))
-/*******************************************************************/
-static void _SPSWS_ultimeter_process_callback(void) {
-    // Update local flag.
-    spsws_ctx.flags.ultimeter_process = 1;
-}
-#endif
-
 #if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
 /*******************************************************************/
 static void _SPSWS_load_weather_data_period(void) {
@@ -255,10 +246,10 @@ static void _SPSWS_load_weather_data_period(void) {
 static void _SPSWS_store_weather_data_period(uint8_t weather_data_period) {
     // Local variables.
     NVM_status_t nvm_status = NVM_SUCCESS;
-    // Monitoring period.
+    // Weather data period.
     if (weather_data_period < SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST) {
         // Update context.
-        spsws_ctx.weather_data_period  = weather_data_period;
+        spsws_ctx.weather_data_period = weather_data_period;
         // Write new value in NVM.
         nvm_status = NVM_write_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, weather_data_period);
         NVM_stack_error(ERROR_BASE_NVM);
@@ -490,8 +481,8 @@ static void _SPSWS_compute_final_measurements(void) {
     // Check status.
     if (sen15901_status == SEN15901_SUCCESS) {
 #endif
-        spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_kmh = (generic_s32_1 / 1000);
-        spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_kmh = (generic_s32_2 / 1000);
+        MATH_rounded_division(spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_kmh, uint8_t, generic_s32_1, 10);
+        MATH_rounded_division(spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_kmh, uint8_t, generic_s32_2, 10);
     }
     // Wind direction.
     spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_two_degrees = SIGFOX_EP_ERROR_VALUE_WIND;
@@ -565,7 +556,7 @@ static void _SPSWS_set_clock(uint8_t device_state) {
 #ifndef SPSWS_MODE_CLI
     // Update MCU clock source.
     mcu_clock_source = RCC_get_system_clock();
-    spsws_ctx.status.mcu_clock_source = (mcu_clock_source == RCC_CLOCK_HSE) ? 0b1 : 0b0;
+    spsws_ctx.status.hse_status = (mcu_clock_source == RCC_CLOCK_HSE) ? 0b1 : 0b0;
     // Update LSI status.
     rcc_status = RCC_get_status(RCC_CLOCK_LSI, &clock_status);
     RCC_stack_error(ERROR_BASE_RCC);
@@ -827,7 +818,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     _SPSWS_set_date_time(&rtc_time);
                     break;
                 default:
-                    ERROR_stack_add(ERROR_DL_OP_CODE);
+                    ERROR_stack_add(ERROR_SIGFOX_EP_DL_OP_CODE);
                     break;
                 }
             }
@@ -953,7 +944,7 @@ static void _SPSWS_init_hw(void) {
 #if ((defined SPSWS_WIND_RAINFALL_MEASUREMENTS) && !(defined SPSWS_MODE_CLI))
     // Init wind vane and rainfall driver.
 #ifdef SPSWS_WIND_VANE_ULTIMETER
-    ultimeter_status = ULTIMETER_init(&_SPSWS_ultimeter_process_callback);
+    ultimeter_status = ULTIMETER_init();
     ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
     sen15901_status = SEN15901_init();
     SEN15901_stack_error(ERROR_BASE_SEN15901);
@@ -1341,20 +1332,14 @@ int main(void) {
             // Read uptime.
             generic_u32_1 = RTC_get_uptime_seconds();
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
+#ifndef SPSWS_WIND_VANE_ULTIMETER
             // Check wind driver process flag.
-#ifdef SPSWS_WIND_VANE_ULTIMETER
-            if (spsws_ctx.flags.ultimeter_process != 0) {
-                // Clear flag.
-                spsws_ctx.flags.ultimeter_process = 0;
-                // Process driver.
-                ultimeter_status = ULTIMETER_process();
-                ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
-            }
-#else
             if (spsws_ctx.flags.sen15901_process != 0) {
                 // Clear flag.
                 spsws_ctx.flags.sen15901_process = 0;
                 // Process driver.
+                sen15901_status = SEN15901_set_wind_measurement(0);
+                SEN15901_stack_error(ERROR_BASE_SEN15901);
                 sen15901_status = SEN15901_process();
                 SEN15901_stack_error(ERROR_BASE_SEN15901);
             }
@@ -1429,10 +1414,15 @@ int main(void) {
                 // Compute next state
                 spsws_ctx.state = SPSWS_STATE_MEASURE;
             }
+#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
 #ifdef SPSWS_WIND_VANE_ULTIMETER
             // Measurements must be stopped on any wake-up in order to have the LPTIM available.
             ultimeter_status = ULTIMETER_set_wind_measurement((spsws_ctx.state == SPSWS_STATE_SLEEP) ? 1 : 0);
             ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
+#else
+            sen15901_status = SEN15901_set_wind_measurement((spsws_ctx.state == SPSWS_STATE_SLEEP) ? 1 : 0);
+            SEN15901_stack_error(ERROR_BASE_SEN15901);
+#endif
 #endif
             break;
         case SPSWS_STATE_SLEEP:

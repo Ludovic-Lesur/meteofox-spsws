@@ -12,7 +12,9 @@
 #endif
 #include "analog.h"
 #include "error.h"
+#include "error_base.h"
 #include "exti.h"
+#include "lptim.h"
 #include "mcu_mapping.h"
 #include "nvic.h"
 #include "nvic_priority.h"
@@ -76,6 +78,41 @@ SEN15901_status_t SEN15901_HW_set_wind_speed_interrupt(uint8_t enable) {
         EXTI_enable_gpio_interrupt(&SEN15901_HW_GPIO_WIND_SPEED);
     }
     return status;
+}
+#endif
+
+#ifdef SEN15901_DRIVER_WIND_MEASUREMENTS_ENABLE
+/*******************************************************************/
+SEN15901_status_t SEN15901_HW_timer_start(void) {
+    // Local variables.
+    SEN15901_status_t status = SEN15901_SUCCESS;
+    LPTIM_status_t lptim_status = LPTIM_SUCCESS;
+    // Start timer.
+    lptim_status = LPTIM_start(LPTIM_CLOCK_PRESCALER_8);
+    LPTIM_exit_error(SEN15901_ERROR_BASE_TIMER);
+errors:
+    return status;
+}
+#endif
+
+#ifdef SEN15901_DRIVER_WIND_MEASUREMENTS_ENABLE
+/*******************************************************************/
+SEN15901_status_t SEN15901_HW_timer_stop(void) {
+    // Local variables.
+    SEN15901_status_t status = SEN15901_SUCCESS;
+    LPTIM_status_t lptim_status = LPTIM_SUCCESS;
+    // Stop timer.
+    lptim_status = LPTIM_stop();
+    LPTIM_stack_error(ERROR_BASE_SEN15901 + SEN15901_ERROR_BASE_TIMER);
+    return status;
+}
+#endif
+
+#ifdef SEN15901_DRIVER_WIND_MEASUREMENTS_ENABLE
+/*******************************************************************/
+uint32_t SEN15901_HW_timer_get_counter(void) {
+    // Read counter.
+    return LPTIM_get_counter();
 }
 #endif
 

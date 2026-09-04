@@ -45,7 +45,7 @@
  *******************************************************************/
 typedef enum {
     SUCCESS = 0,
-    ERROR_DL_OP_CODE,
+    ERROR_SIGFOX_EP_DL_OP_CODE,
     ERROR_SIGFOX_EP_DL_WEATHER_DATA_PERIOD,
     // Peripherals.
     ERROR_BASE_AES = ERROR_BASE_STEP,
