@@ -61,8 +61,8 @@
 #define SPSWS_WEATHER_REQUEST_OFF_STORAGE_VOLTAGE_THRESHOLD_MV  1500
 #define SPSWS_WEATHER_REQUEST_ON_STORAGE_VOLTAGE_THRESHOLD_MV   2000
 // Measurements buffers length.
-#define SPSWS_MEASUREMENT_PERIOD_SECONDS                        60
-#define SPSWS_MEASUREMENT_BUFFER_SIZE                           (3600 / SPSWS_MEASUREMENT_PERIOD_SECONDS)
+#define SPSWS_MEASUREMENT_PERIOD_SECONDS                        MATH_SECONDS_PER_MINUTE
+#define SPSWS_MEASUREMENT_BUFFER_SIZE                           (MATH_SECONDS_PER_HOUR / SPSWS_MEASUREMENT_PERIOD_SECONDS)
 #ifdef SPSWS_SEN15901_EMULATOR
 #define SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO                    GPIO_DIO4
 #endif
@@ -91,6 +91,7 @@ typedef enum {
 typedef union {
     uint8_t all;
     struct {
+        unsigned configuration_updated :1;
         unsigned daily_downlink :1;
         unsigned daily_geoloc :1;
         unsigned daily_rtc_calibration :1;
@@ -98,7 +99,6 @@ typedef union {
         unsigned lse_status :1;
         unsigned lsi_status :1;
         unsigned hse_status :1;
-        unsigned station_mode :1;
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SPSWS_status_t;
 
@@ -136,8 +136,8 @@ typedef struct {
 typedef struct {
     SPSWS_measurement_t temperature_ambiant_tenth_degrees;
     SPSWS_measurement_t humidity_ambiant_percent;
-    SPSWS_measurement_t sunshine_light_percent;
-    SPSWS_measurement_t sunshine_uv_index;
+    SPSWS_measurement_t sunshine_light_mlux;
+    SPSWS_measurement_t sunshine_uv_index_duvi;
     SPSWS_measurement_t pressure_atmospheric_absolute_pa;
     SPSWS_measurement_t temperature_pcb_tenth_degrees;
     SPSWS_measurement_t humidity_pcb_percent;
@@ -243,9 +243,11 @@ static void _SPSWS_load_weather_data_period(void) {
 
 #if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
 /*******************************************************************/
-static void _SPSWS_store_weather_data_period(uint8_t weather_data_period) {
+static void _SPSWS_store_weather_data_period(uint8_t weather_data_period, uint8_t* configuration_status) {
     // Local variables.
     NVM_status_t nvm_status = NVM_SUCCESS;
+    // Set status to success by default.
+    (*configuration_status) = 1;
     // Weather data period.
     if (weather_data_period < SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST) {
         // Update context.
@@ -256,6 +258,7 @@ static void _SPSWS_store_weather_data_period(uint8_t weather_data_period) {
     }
     else {
         ERROR_stack_add(ERROR_SIGFOX_EP_DL_WEATHER_DATA_PERIOD);
+        (*configuration_status) = 0;
     }
 }
 #endif
@@ -285,10 +288,10 @@ static void _SPSWS_reset_measurements(void) {
     spsws_ctx.measurements.temperature_ambiant_tenth_degrees.full_flag = 0;
     spsws_ctx.measurements.humidity_ambiant_percent.sample_count = 0;
     spsws_ctx.measurements.humidity_ambiant_percent.full_flag = 0;
-    spsws_ctx.measurements.sunshine_light_percent.sample_count = 0;
-    spsws_ctx.measurements.sunshine_light_percent.full_flag = 0;
-    spsws_ctx.measurements.sunshine_uv_index.sample_count = 0;
-    spsws_ctx.measurements.sunshine_uv_index.full_flag = 0;
+    spsws_ctx.measurements.sunshine_light_mlux.sample_count = 0;
+    spsws_ctx.measurements.sunshine_light_mlux.full_flag = 0;
+    spsws_ctx.measurements.sunshine_uv_index_duvi.sample_count = 0;
+    spsws_ctx.measurements.sunshine_light_mlux.full_flag = 0;
     spsws_ctx.measurements.pressure_atmospheric_absolute_pa.sample_count = 0;
     spsws_ctx.measurements.pressure_atmospheric_absolute_pa.full_flag = 0;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
@@ -316,8 +319,10 @@ static void _SPSWS_reset_measurements(void) {
 static void _SPSWS_compute_final_measurements(void) {
     // Local variables.
     MATH_status_t math_status = MATH_SUCCESS;
+    SIGFOX_EP_ul_payload_sunshine_light_t sunshine_light;
     uint32_t sample_count = 0;
     int32_t generic_s32_1 = 0;
+    int32_t generic_s32_2 = 0;
     uint32_t generic_u32 = 0;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
 #ifdef SPSWS_WIND_VANE_ULTIMETER
@@ -327,7 +332,6 @@ static void _SPSWS_compute_final_measurements(void) {
     SEN15901_wind_direction_status_t wind_direction_status = SEN15901_WIND_DIRECTION_STATUS_AVAILABLE;
 #endif
     SEN15901_status_t sen15901_status = SEN15901_SUCCESS;
-    int32_t generic_s32_2 = 0;
     SIGFOX_EP_ul_payload_rainfall_t rainfall;
 #endif
     // Temperature.
@@ -358,29 +362,55 @@ static void _SPSWS_compute_final_measurements(void) {
         }
     }
     // Light.
-    spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_light_percent = SIGFOX_EP_ERROR_VALUE_SUNSHINE_LIGHT;
-    sample_count = (spsws_ctx.measurements.sunshine_light_percent.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.sunshine_light_percent.sample_count;
+    sunshine_light.all = SIGFOX_EP_ERROR_VALUE_SUNSHINE_LIGHT;
+    sample_count = (spsws_ctx.measurements.sunshine_light_mlux.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.sunshine_light_mlux.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_median_filter(spsws_ctx.measurements.sunshine_light_percent.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
+        math_status = MATH_median_filter(spsws_ctx.measurements.sunshine_light_mlux.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
-            spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_light_percent = (uint8_t) generic_s32_1;
+            // Clamp value if needed.
+            if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_MAX_MLUX) {
+                generic_s32_1 = SIGFOX_EP_SHUNSHINE_LIGHT_MAX_MLUX;
+            }
+            // Check range.
+            if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_HIGH_MLUX) {
+                // Unit in ten lux.
+                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TEN_LUX;
+            }
+            else if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_MIDDLE_MLUX) {
+                // Unit in lux.
+                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_LUX;
+            }
+            else if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_LOW_MLUX) {
+                // Unit in tenth of lux.
+                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TENTH_LUX;
+            }
+            else {
+                // Unit in hundredth of lux.
+                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_HUNDREDTH_LUX;
+            }
+            math_status = MATH_rounded_division(generic_s32_1, (int32_t) MATH_POWER_10[sunshine_light.unit + 1], &generic_s32_2);
+            MATH_stack_error(ERROR_BASE_MATH);
+            if (math_status == MATH_SUCCESS) {
+                sunshine_light.value = generic_s32_2;
+            }
         }
     }
+    spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_light = sunshine_light.all;
     // UV index.
-    spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_uv_index = SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX;
-    sample_count = (spsws_ctx.measurements.sunshine_uv_index.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.sunshine_uv_index.sample_count;
+    spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_uv_index_duvi = SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX;
+    sample_count = (spsws_ctx.measurements.sunshine_uv_index_duvi.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.sunshine_uv_index_duvi.sample_count;
     if (sample_count > 0) {
         // Compute single value.
-        math_status = MATH_max(spsws_ctx.measurements.sunshine_uv_index.sample_buffer, sample_count, &generic_s32_1);
+        math_status = MATH_max(spsws_ctx.measurements.sunshine_uv_index_duvi.sample_buffer, sample_count, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
             // Clamp value.
             if (generic_s32_1 >= SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX) {
                 generic_s32_1 = (SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX - 1);
             }
-            spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_uv_index = (uint8_t) generic_s32_1;
+            spsws_ctx.sigfox_ep_ul_payload_weather.sunshine_uv_index_duvi = (uint8_t) generic_s32_1;
         }
     }
     // Absolute pressure.
@@ -468,8 +498,8 @@ static void _SPSWS_compute_final_measurements(void) {
     }
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
     // Wind speed.
-    spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_kmh = SIGFOX_EP_ERROR_VALUE_WIND;
-    spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_kmh = SIGFOX_EP_ERROR_VALUE_WIND;
+    spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_tenth_kmh = SIGFOX_EP_ERROR_VALUE_WIND_SPEED;
+    spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_tenth_kmh = SIGFOX_EP_ERROR_VALUE_WIND_SPEED;
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ultimeter_status = ULTIMETER_get_wind_speed(&generic_s32_1, &generic_s32_2);
     ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
@@ -481,11 +511,18 @@ static void _SPSWS_compute_final_measurements(void) {
     // Check status.
     if (sen15901_status == SEN15901_SUCCESS) {
 #endif
-        MATH_rounded_division(spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_kmh, uint8_t, generic_s32_1, 10);
-        MATH_rounded_division(spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_kmh, uint8_t, generic_s32_2, 10);
+        // Clamp values.
+        if (generic_s32_1 >= SIGFOX_EP_ERROR_VALUE_WIND_SPEED) {
+            generic_s32_1 = (SIGFOX_EP_ERROR_VALUE_WIND_SPEED - 1);
+        }
+        if (generic_s32_2 >= SIGFOX_EP_ERROR_VALUE_WIND_SPEED) {
+            generic_s32_2 = (SIGFOX_EP_ERROR_VALUE_WIND_SPEED - 1);
+        }
+        spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_average_tenth_kmh = generic_s32_1;
+        spsws_ctx.sigfox_ep_ul_payload_weather.wind_speed_peak_tenth_kmh = generic_s32_2;
     }
     // Wind direction.
-    spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_two_degrees = SIGFOX_EP_ERROR_VALUE_WIND;
+    spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_degrees = SIGFOX_EP_ERROR_VALUE_WIND_DIRECTION;
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ultimeter_status = ULTIMETER_get_wind_direction(&generic_s32_1, &wind_direction_status);
     ULTIMETER_stack_error(ERROR_BASE_ULTIMETER);
@@ -497,10 +534,10 @@ static void _SPSWS_compute_final_measurements(void) {
     // Check status.
     if ((sen15901_status == SEN15901_SUCCESS) && (wind_direction_status == SEN15901_WIND_DIRECTION_STATUS_AVAILABLE)) {
 #endif
-        spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_two_degrees = (generic_s32_1 >> 1);
+        spsws_ctx.sigfox_ep_ul_payload_weather.wind_direction_average_degrees = generic_s32_1;
     }
     // Rainfall.
-    rainfall.all = SIGFOX_EP_ERROR_VALUE_RAIN;
+    rainfall.all = SIGFOX_EP_ERROR_VALUE_RAINFALL;
     sen15901_status = SEN15901_get_rainfall(&generic_s32_1);
     SEN15901_stack_error(ERROR_BASE_SEN15901);
     // Check status.
@@ -513,16 +550,15 @@ static void _SPSWS_compute_final_measurements(void) {
         if (generic_s32_1 > SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM) {
             // Unit in millimeter.
             rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM;
-            rainfall.value = (generic_s32_1 / 1000);
-            // Rounding operation.
-            if ((generic_s32_1 - (rainfall.value * 1000)) >= 500) {
-                rainfall.value++;
-            }
         }
         else {
             // Unit in tenth of millimeter.
             rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_TENTH_MM;
-            rainfall.value = (generic_s32_1 / 100);
+        }
+        math_status = MATH_rounded_division(generic_s32_1, (int32_t) MATH_POWER_10[rainfall.unit + 2], &generic_s32_2);
+        MATH_stack_error(ERROR_BASE_MATH);
+        if (math_status == MATH_SUCCESS) {
+            rainfall.value = generic_s32_2;
         }
     }
     spsws_ctx.sigfox_ep_ul_payload_weather.rainfall = rainfall.all;
@@ -734,9 +770,11 @@ static void _SPSWS_update_nvm_data(SPSWS_nvm_data_t timestamp_type) {
 
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
-static void _SPSWS_set_date_time(RTC_time_t* rtc_time) {
+static void _SPSWS_set_date_time(RTC_time_t* rtc_time, uint8_t* configuration_status) {
     // Local variables.
     RTC_status_t rtc_status = RTC_SUCCESS;
+    // Set status to error by default.
+    (*configuration_status) = 0;
     // Update RTC registers.
     rtc_status = RTC_set_time(rtc_time);
     RTC_stack_error(ERROR_BASE_RTC);
@@ -747,6 +785,7 @@ static void _SPSWS_set_date_time(RTC_time_t* rtc_time) {
             _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_WAKE_UP);
         }
         // Update status.
+        (*configuration_status) = 1;
         spsws_ctx.status.first_rtc_calibration = 1;
         spsws_ctx.status.daily_rtc_calibration = 1;
     }
@@ -765,6 +804,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SIGFOX_EP_dl_payload_t dl_payload;
     int16_t dl_rssi = 0;
     RTC_time_t rtc_time;
+    uint8_t configuration_status = 0;
 #endif
     // Directly exit of the radio is disabled due to low supercap voltage.
     if (spsws_ctx.flags.radio_enabled == 0) goto errors;
@@ -778,6 +818,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     // Send message.
     sigfox_ep_api_status = SIGFOX_EP_API_send_application_message(application_message);
     SIGFOX_EP_API_check_status(0);
+    // Reload watchdog.
+    IWDG_reload();
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     // Check bidirectional flag.
     if ((application_message->bidirectional_flag) == SIGFOX_TRUE) {
@@ -804,7 +846,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     break;
                 case SIGFOX_EP_DL_OP_CODE_SET_WEATHER_DATA_PERIOD:
                     // Check and store new configuration.
-                    _SPSWS_store_weather_data_period(dl_payload.set_weather_data_period.weather_data_period);
+                    _SPSWS_store_weather_data_period(dl_payload.set_weather_data_period.weather_data_period, &configuration_status);
                     break;
                 case SIGFOX_EP_DL_OP_CODE_SET_DATE_TIME:
                     // Update RTC time.
@@ -815,7 +857,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     rtc_time.minutes = dl_payload.set_date_time.minutes;
                     rtc_time.seconds = dl_payload.set_date_time.seconds;
                     // Update RTC.
-                    _SPSWS_set_date_time(&rtc_time);
+                    _SPSWS_set_date_time(&rtc_time, &configuration_status);
                     break;
                 default:
                     ERROR_stack_add(ERROR_SIGFOX_EP_DL_OP_CODE);
@@ -823,8 +865,10 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                 }
             }
         }
-        // Update timestamp and status.
+        // Update timestamp.
         _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_DOWNLINK);
+        // Update status.
+        spsws_ctx.status.configuration_updated = (configuration_status == 0) ? 0 : 1;
         // Clear request.
         spsws_ctx.flags.downlink_request = 0;
     }
@@ -843,6 +887,10 @@ errors:
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
 static void _SPSWS_init_context(void) {
+    // Local variables.
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    uint8_t unused_status = 0;
+#endif
     // Init context.
     spsws_ctx.state = SPSWS_STATE_STARTUP;
     spsws_ctx.flags.all = 0;
@@ -860,13 +908,7 @@ static void _SPSWS_init_context(void) {
     spsws_ctx.weather_message_count = 0;
     // Load configuration from NVM.
     _SPSWS_load_weather_data_period();
-    _SPSWS_store_weather_data_period(spsws_ctx.weather_data_period);
-#endif
-    // Init station mode.
-#ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
-    spsws_ctx.status.station_mode = 0b1;
-#else
-    spsws_ctx.status.station_mode = 0b0;
+    _SPSWS_store_weather_data_period(spsws_ctx.weather_data_period, &unused_status);
 #endif
 }
 #endif
@@ -981,6 +1023,7 @@ int main(void) {
     ULTIMETER_status_t ultimeter_status = ULTIMETER_SUCCESS;
 #endif
 #endif
+    SI1133_light_status_t si1133_light_status = SI1133_LIGHT_STATUS_AVAILABLE;
     GPS_time_t gps_time;
     RTC_time_t rtc_time;
     GPS_position_t gps_position;
@@ -991,6 +1034,7 @@ int main(void) {
     SIGFOX_EP_ul_payload_geoloc_timeout_t sigfox_ep_ul_payload_geoloc_timeout;
     ERROR_code_t error_code = 0;
     uint8_t sigfox_ep_ul_payload_error_stack[SIGFOX_EP_UL_PAYLOAD_SIZE_ERROR_STACK];
+    uint8_t generic_u8 = 0;
     uint32_t generic_u32_1 = 0;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     uint32_t generic_u32_2 = 0;
@@ -1088,12 +1132,6 @@ int main(void) {
                     spsws_ctx.flags.weather_request_enabled = 1;
                 }
             }
-            // Light sensor.
-            analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_SUNSHINE_LIGHT_PERCENT, &generic_s32_1);
-            ANALOG_stack_error(ERROR_BASE_ANALOG);
-            if (analog_status == ANALOG_SUCCESS) {
-                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_light_percent), generic_s32_1);
-            }
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_ANALOG);
             // Internal temperature/humidity sensor.
             sht3x_status = SHT3X_get_temperature_humidity(I2C_ADDRESS_SHT30_INTERNAL, &generic_s32_1, &generic_s32_2);
@@ -1128,12 +1166,13 @@ int main(void) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.pressure_atmospheric_absolute_pa), generic_s32_1);
             }
             // External UV index sensor.
-            si1133_status = SI1133_get_uv_index(I2C_ADDRESS_SI1133, &generic_s32_1);
+            si1133_status = SI1133_get_light_uv_index(I2C_ADDRESS_SI1133, &generic_s32_1, &generic_s32_2, &si1133_light_status);
             SI1133_stack_error(ERROR_BASE_SI1133);
             // Check status.
-            if (si1133_status == SI1133_SUCCESS) {
-                // Store UV index.
-                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_uv_index), generic_s32_1);
+            if ((si1133_status == SI1133_SUCCESS) && (si1133_light_status == SI1133_LIGHT_STATUS_AVAILABLE)) {
+                // Store light and UV index.
+                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_light_mlux), generic_s32_1);
+                _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_uv_index_duvi), generic_s32_2);
             }
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_SENSORS);
             // Clear flag.
@@ -1295,7 +1334,7 @@ int main(void) {
                     rtc_time.minutes = gps_time.minutes;
                     rtc_time.seconds = gps_time.seconds;
                     // Update RTC.
-                    _SPSWS_set_date_time(&rtc_time);
+                    _SPSWS_set_date_time(&rtc_time, &generic_u8);
                 }
                 if (por_flag != 0) {
                     // In POR condition, RTC alarm will occur during the first GPS time acquisition because of the RTC reset and the random delay.

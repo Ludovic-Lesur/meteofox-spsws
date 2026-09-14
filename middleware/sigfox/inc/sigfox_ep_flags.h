@@ -205,7 +205,9 @@
  * \def SIGFOX_EP_PARAMETERS_CHECK
  * \brief Enable parameters check if defined.
  *******************************************************************/
+#ifndef HW1_0
 #define SIGFOX_EP_PARAMETERS_CHECK
+#endif
 
 /*!******************************************************************
  * \def SIGFOX_EP_CERTIFICATION

@@ -77,7 +77,7 @@ static AT_status_t _CLI_iths_callback(void);
 static AT_status_t _CLI_eths_callback(void);
 #endif
 static AT_status_t _CLI_epts_callback(void);
-static AT_status_t _CLI_euvs_callback(void);
+static AT_status_t _CLI_eluvs_callback(void);
 static AT_status_t _CLI_time_callback(void);
 static AT_status_t _CLI_gps_callback(void);
 #ifdef SIGFOX_EP_CONTROL_KEEP_ALIVE_MESSAGE
@@ -157,10 +157,10 @@ static const AT_command_t CLI_COMMANDS_LIST[] = {
         .callback = &_CLI_epts_callback
     },
     {
-        .syntax = "$EUVS?",
+        .syntax = "$ELUVS?",
         .parameters = NULL,
-        .description = "Read UV index",
-        .callback = &_CLI_euvs_callback
+        .description = "Read ambient light and UV index",
+        .callback = &_CLI_eluvs_callback
     },
     {
         .syntax = "$TIME=",
@@ -505,19 +505,35 @@ errors:
 }
 
 /*******************************************************************/
-static AT_status_t _CLI_euvs_callback(void) {
+static AT_status_t _CLI_eluvs_callback(void) {
     // Local variables.
     AT_status_t status = AT_SUCCESS;
     SI1133_status_t si1133_status = SI1133_SUCCESS;
-    int32_t uv_index = 0;
+    int32_t light_mlux = 0;
+    int32_t uv_index_duvi = 0;
+    SI1133_light_status_t light_status = SI1133_LIGHT_STATUS_AVAILABLE;
     // Turn digital sensors on.
     POWER_enable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
     // Perform measurements.
-    si1133_status = SI1133_get_uv_index(I2C_ADDRESS_SI1133, &uv_index);
+    si1133_status = SI1133_get_light_uv_index(I2C_ADDRESS_SI1133, &light_mlux, &uv_index_duvi, &light_status);
     _CLI_check_driver_status(si1133_status, SI1133_SUCCESS, ERROR_BASE_SI1133);
-    // Read and print data.
+    // Check result.
+    if (light_status == SI1133_LIGHT_STATUS_AVAILABLE) {
+        // Print data.
+        AT_reply_add_string("Light=");
+        AT_reply_add_integer(light_mlux, STRING_FORMAT_DECIMAL, 0);
+        AT_reply_add_string("mlux");
+        AT_reply_send();
+    }
+    else {
+        AT_reply_add_string("Light not available (");
+        AT_reply_add_integer(light_status, STRING_FORMAT_HEXADECIMAL, 1);
+        AT_reply_add_string(")");
+        AT_reply_send();
+    }
     AT_reply_add_string("UVI=");
-    AT_reply_add_integer(uv_index, STRING_FORMAT_DECIMAL, 0);
+    AT_reply_add_integer(uv_index_duvi, STRING_FORMAT_DECIMAL, 0);
+    AT_reply_add_string("dUVI");
     AT_reply_send();
 errors:
     POWER_disable(POWER_REQUESTER_ID_CLI, POWER_DOMAIN_SENSORS);
