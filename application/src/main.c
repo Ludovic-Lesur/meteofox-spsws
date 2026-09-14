@@ -54,6 +54,11 @@
 #define SPSWS_POWER_ON_DELAY_MS                                 7000
 #define SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS                   180
 #define SPSWS_GEOLOC_TIMEOUT_SECONDS                            120
+// Weather data period.
+#define SPSWS_WEATHER_DATA_PERIOD_MIN                           SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES
+#define SPSWS_WEATHER_DATA_PERIOD_DEFAULT                       SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES
+#define SPSWS_WEATHER_DATA_PERIOD_MAX                           (SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST - 1)
+#define SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET                    0x55
 // Voltage hysteresis for radio.
 #define SPSWS_RADIO_OFF_STORAGE_VOLTAGE_THRESHOLD_MV            1000
 #define SPSWS_RADIO_ON_STORAGE_VOLTAGE_THRESHOLD_MV             1500
@@ -155,6 +160,14 @@ typedef enum {
     SPSWS_NVM_DATA_LAST
 } SPSWS_nvm_data_t;
 
+/*!******************************************************************
+ * \struct SPSWS_configuration_t
+ * \brief Weather station configuration structure.
+ *******************************************************************/
+typedef struct {
+    uint8_t weather_data_period;
+} SPSWS_configuration_t;
+
 /*******************************************************************/
 typedef struct {
     // State machine.
@@ -164,19 +177,19 @@ typedef struct {
     // Intermediate measurements.
     uint32_t measurements_last_time_seconds;
     SPSWS_measurements_t measurements;
-#ifdef SIGFOX_EP_BIDIRECTIONAL
+    // Monitoring.
+    SIGFOX_EP_ul_payload_monitoring_t sigfox_ep_ul_payload_monitoring;
     // Weather data.
-    volatile uint32_t sharp_hour_uptime;
-    uint8_t weather_data_period;
-    uint32_t weather_message_count;
-    uint32_t weather_last_time_seconds;
-#endif
+    SPSWS_EP_ul_payload_weather_t sigfox_ep_ul_payload_weather;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
     SENSORS_HW_wind_tick_second_irq_cb_t wind_tick_second_callback;
 #endif
-    // Sigfox frames.
-    SPSWS_EP_ul_payload_weather_t sigfox_ep_ul_payload_weather;
-    SIGFOX_EP_ul_payload_monitoring_t sigfox_ep_ul_payload_monitoring;
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    SPSWS_configuration_t configuration;
+    volatile uint32_t sharp_hour_uptime;
+    uint32_t weather_message_count;
+    uint32_t weather_last_time_seconds;
+#endif
 } SPSWS_context_t;
 
 /*** SPSWS global variables ***/
@@ -228,16 +241,17 @@ static void _SPSWS_sen15901_process_callback(void) {
 static void _SPSWS_load_weather_data_period(void) {
     // Local variables.
     NVM_status_t nvm_status = NVM_SUCCESS;
-    uint8_t weather_data_period = 0;
+    uint8_t nvm_byte = 0;
     // Read monitoring period.
-    nvm_status = NVM_read_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, &weather_data_period);
+    nvm_status = NVM_read_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, &nvm_byte);
     NVM_stack_error(ERROR_BASE_NVM);
     // Check value.
-    if (weather_data_period >= SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST) {
+    if ((nvm_byte < (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + SPSWS_WEATHER_DATA_PERIOD_MIN)) || (nvm_byte > (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + SPSWS_WEATHER_DATA_PERIOD_MAX))) {
         // Reset to default value.
-        weather_data_period = SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES;
+        nvm_byte = (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + SPSWS_WEATHER_DATA_PERIOD_DEFAULT);
+        ERROR_stack_add(ERROR_NVM_WEATHER_DATA_PERIOD);
     }
-    spsws_ctx.weather_data_period = weather_data_period;
+    spsws_ctx.configuration.weather_data_period = (nvm_byte - SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET);
 }
 #endif
 
@@ -251,9 +265,9 @@ static void _SPSWS_store_weather_data_period(uint8_t weather_data_period, uint8_
     // Weather data period.
     if (weather_data_period < SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST) {
         // Update context.
-        spsws_ctx.weather_data_period = weather_data_period;
+        spsws_ctx.configuration.weather_data_period = weather_data_period;
         // Write new value in NVM.
-        nvm_status = NVM_write_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, weather_data_period);
+        nvm_status = NVM_write_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + weather_data_period));
         NVM_stack_error(ERROR_BASE_NVM);
     }
     else {
@@ -887,10 +901,6 @@ errors:
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
 static void _SPSWS_init_context(void) {
-    // Local variables.
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-    uint8_t unused_status = 0;
-#endif
     // Init context.
     spsws_ctx.state = SPSWS_STATE_STARTUP;
     spsws_ctx.flags.all = 0;
@@ -906,9 +916,6 @@ static void _SPSWS_init_context(void) {
     spsws_ctx.sharp_hour_uptime = 0;
     spsws_ctx.weather_last_time_seconds = 0;
     spsws_ctx.weather_message_count = 0;
-    // Load configuration from NVM.
-    _SPSWS_load_weather_data_period();
-    _SPSWS_store_weather_data_period(spsws_ctx.weather_data_period, &unused_status);
 #endif
 }
 #endif
@@ -1001,6 +1008,11 @@ static void _SPSWS_init_hw(void) {
 #ifdef SPSWS_SEN15901_EMULATOR
     // Init SEN15901 emulator synchronization pin.
     GPIO_configure(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
+#endif
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    // Load configuration from NVM.
+    _SPSWS_load_weather_data_period();
+    _SPSWS_store_weather_data_period(spsws_ctx.configuration.weather_data_period, &device_id_lsbyte);
 #endif
 }
 
@@ -1405,7 +1417,7 @@ int main(void) {
             }
             else if (spsws_ctx.flags.first_sharp_hour_alarm != 0) {
                 // Get current period.
-                generic_u32_2 = SPSWS_WEATHER_DATA_PERIOD_SECONDS[spsws_ctx.weather_data_period];
+                generic_u32_2 = SPSWS_WEATHER_DATA_PERIOD_SECONDS[spsws_ctx.configuration.weather_data_period];
                 // Check weather period.
                 if ((generic_u32_1 >= (spsws_ctx.weather_last_time_seconds + generic_u32_2)) && (spsws_ctx.weather_message_count < (3600 / generic_u32_2))) {
                     // Set request and update last time.

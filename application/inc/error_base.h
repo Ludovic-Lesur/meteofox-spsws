@@ -45,6 +45,7 @@
  *******************************************************************/
 typedef enum {
     SUCCESS = 0,
+    ERROR_NVM_WEATHER_DATA_PERIOD,
     ERROR_SIGFOX_EP_DL_OP_CODE,
     ERROR_SIGFOX_EP_DL_WEATHER_DATA_PERIOD,
     // Peripherals.
