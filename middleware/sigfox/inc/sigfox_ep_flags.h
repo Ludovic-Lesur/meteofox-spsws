@@ -141,7 +141,9 @@
  * \def SIGFOX_EP_LATENCY_COMPENSATION
  * \brief If defined, enable radio latency compensation to improve MCU timers accuracy.
  *******************************************************************/
+#ifndef HW1_0
 #define SIGFOX_EP_LATENCY_COMPENSATION
+#endif
 
 /*!******************************************************************
  * \def SIGFOX_EP_SINGLE_FRAME

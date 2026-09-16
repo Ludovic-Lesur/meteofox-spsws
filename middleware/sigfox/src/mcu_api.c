@@ -197,17 +197,15 @@ MCU_API_status_t MCU_API_aes_128_cbc_encrypt(MCU_API_encryption_data_t* aes_data
     MCU_API_status_t status = MCU_API_SUCCESS;
     NVM_status_t nvm_status = NVM_SUCCESS;
     AES_status_t aes_status = AES_SUCCESS;
-    uint8_t idx = 0;
     uint8_t local_key[SIGFOX_EP_KEY_SIZE_BYTES];
     // Get right key.
 #ifdef SIGFOX_EP_PUBLIC_KEY_CAPABLE
+    uint8_t idx = 0;
     switch (aes_data -> key) {
     case SIGFOX_EP_KEY_PRIVATE:
         // Retrieve private key from NVM.
-        for (idx = 0; idx < SIGFOX_EP_KEY_SIZE_BYTES; idx++) {
-            nvm_status = NVM_read_byte((NVM_ADDRESS_SIGFOX_EP_KEY + idx), &(local_key[idx]));
-            NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
-        }
+        nvm_status = NVM_read(NVM_ADDRESS_SIGFOX_EP_KEY, local_key, SIGFOX_EP_KEY_SIZE_BYTES, NVM_DATA_TYPE_BYTE);
+        NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
         break;
     case SIGFOX_EP_KEY_PUBLIC:
         // Use public key.
@@ -220,11 +218,8 @@ MCU_API_status_t MCU_API_aes_128_cbc_encrypt(MCU_API_encryption_data_t* aes_data
         break;
     }
 #else
-    // Retrieve private key from NVM.
-    for (idx = 0; idx < SIGFOX_EP_KEY_SIZE_BYTES; idx++) {
-        nvm_status = NVM_read_byte((NVM_ADDRESS_SIGFOX_EP_KEY + idx), &(local_key[idx]));
-        NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
-    }
+    nvm_status = NVM_read(NVM_ADDRESS_SIGFOX_EP_KEY, local_key, SIGFOX_EP_KEY_SIZE_BYTES, NVM_DATA_TYPE_BYTE);
+    NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
 #endif
     // Init peripheral.
     AES_init();
@@ -269,12 +264,9 @@ MCU_API_status_t MCU_API_get_ep_id(sfx_u8* ep_id, sfx_u8 ep_id_size_bytes) {
     // Local variables.
     MCU_API_status_t status = MCU_API_SUCCESS;
     NVM_status_t nvm_status = NVM_SUCCESS;
-    uint8_t idx = 0;
     // Get device ID.
-    for (idx = 0; idx < ep_id_size_bytes; idx++) {
-        nvm_status = NVM_read_byte((NVM_ADDRESS_SIGFOX_EP_ID + idx), &(ep_id[idx]));
-        NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
-    }
+    nvm_status = NVM_read(NVM_ADDRESS_SIGFOX_EP_ID, ep_id, ep_id_size_bytes, NVM_DATA_TYPE_BYTE);
+    NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
 errors:
     SIGFOX_RETURN();
 }
@@ -295,12 +287,9 @@ MCU_API_status_t MCU_API_get_nvm(sfx_u8* nvm_data, sfx_u8 nvm_data_size_bytes) {
     // Local variables.
     MCU_API_status_t status = MCU_API_SUCCESS;
     NVM_status_t nvm_status = NVM_SUCCESS;
-    uint8_t idx = 0;
     // Read data.
-    for (idx = 0; idx < nvm_data_size_bytes; idx++) {
-        nvm_status = NVM_read_byte((NVM_ADDRESS_SIGFOX_EP_LIB_DATA + idx), &(nvm_data[idx]));
-        NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
-    }
+    nvm_status = NVM_read(NVM_ADDRESS_SIGFOX_EP_LIB_DATA, nvm_data, nvm_data_size_bytes, NVM_DATA_TYPE_BYTE);
+    NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
 errors:
     SIGFOX_RETURN();
 }
@@ -310,12 +299,9 @@ MCU_API_status_t MCU_API_set_nvm(sfx_u8* nvm_data, sfx_u8 nvm_data_size_bytes) {
     // Local variables.
     MCU_API_status_t status = MCU_API_SUCCESS;
     NVM_status_t nvm_status = NVM_SUCCESS;
-    uint8_t idx = 0;
     // Write data.
-    for (idx = 0; idx < nvm_data_size_bytes; idx++) {
-        nvm_status = NVM_write_byte((NVM_ADDRESS_SIGFOX_EP_LIB_DATA + idx), nvm_data[idx]);
-        NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
-    }
+    nvm_status = NVM_write(NVM_ADDRESS_SIGFOX_EP_LIB_DATA, nvm_data, nvm_data_size_bytes, NVM_DATA_TYPE_BYTE);
+    NVM_stack_exit_error(ERROR_BASE_NVM, (MCU_API_status_t) MCU_API_ERROR_DRIVER_NVM);
 errors:
     SIGFOX_RETURN();
 }

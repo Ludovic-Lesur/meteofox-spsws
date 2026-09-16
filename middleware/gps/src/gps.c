@@ -11,13 +11,20 @@
 #include "error_base.h"
 #include "iwdg.h"
 #include "neom8x.h"
+#include "neom8x_driver_flags.h"
 #include "pwr.h"
 #include "rtc.h"
 #include "types.h"
 
 /*** GPS local macros ***/
 
-#define GPS_TIMEOUT_SECONDS     10
+#define GPS_TIMEOUT_SECONDS                 10
+
+#if (NEOM8X_DRIVER_ALTITUDE_STABILITY_FILTER_MODE > 0)
+#define GPS_EXPECTED_ACQUISITION_STATUS     NEOM8X_ACQUISITION_STATUS_STABLE
+#else
+#define GPS_EXPECTED_ACQUISITION_STATUS     NEOM8X_ACQUISITION_STATUS_FOUND
+#endif
 
 /*** GPS local structures ***/
 
@@ -171,7 +178,7 @@ GPS_status_t GPS_get_position(GPS_position_t* gps_position, uint32_t timeout_sec
     (*acquisition_duration_seconds) = 0;
     (*acquisition_status) = GPS_ACQUISITION_ERROR_TIMEOUT;
     // Perform position acquisition.
-    status = _GPS_perform_acquisition(NEOM8X_GPS_DATA_POSITION, NEOM8X_ACQUISITION_STATUS_STABLE, timeout_seconds, acquisition_duration_seconds);
+    status = _GPS_perform_acquisition(NEOM8X_GPS_DATA_POSITION, GPS_EXPECTED_ACQUISITION_STATUS, timeout_seconds, acquisition_duration_seconds);
     if (status != GPS_SUCCESS) goto errors;
     // Check status.
     if (gps_ctx.acquisition_status != NEOM8X_ACQUISITION_STATUS_FAIL) {

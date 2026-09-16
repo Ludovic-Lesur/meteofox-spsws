@@ -59,6 +59,13 @@
 #define SPSWS_WEATHER_DATA_PERIOD_DEFAULT                       SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES
 #define SPSWS_WEATHER_DATA_PERIOD_MAX                           (SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST - 1)
 #define SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET                    0x55
+// Lux and UV index calibration.
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN       1
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_DEFAULT   1
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX       4095
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN     1
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT 1
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX     4095
 // Voltage hysteresis for radio.
 #define SPSWS_RADIO_OFF_STORAGE_VOLTAGE_THRESHOLD_MV            1000
 #define SPSWS_RADIO_ON_STORAGE_VOLTAGE_THRESHOLD_MV             1500
@@ -161,11 +168,22 @@ typedef enum {
 } SPSWS_nvm_data_t;
 
 /*!******************************************************************
+ * \struct SPSWS_lux_uv_index_calibration_t
+ * \brief Light sensor calibration parameters.
+ *******************************************************************/
+typedef struct {
+    uint16_t gain_numerator;
+    uint16_t gain_denominator;
+} SPSWS_lux_uv_index_calibration_t;
+
+/*!******************************************************************
  * \struct SPSWS_configuration_t
  * \brief Weather station configuration structure.
  *******************************************************************/
 typedef struct {
     uint8_t weather_data_period;
+    SPSWS_lux_uv_index_calibration_t lux_calibration;
+    SPSWS_lux_uv_index_calibration_t uv_index_calibration;
 } SPSWS_configuration_t;
 
 /*******************************************************************/
@@ -243,7 +261,7 @@ static void _SPSWS_load_weather_data_period(void) {
     NVM_status_t nvm_status = NVM_SUCCESS;
     uint8_t nvm_byte = 0;
     // Read monitoring period.
-    nvm_status = NVM_read_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_WEATHER_DATA_PERIOD, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
     // Check value.
     if ((nvm_byte < (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + SPSWS_WEATHER_DATA_PERIOD_MIN)) || (nvm_byte > (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + SPSWS_WEATHER_DATA_PERIOD_MAX))) {
@@ -260,6 +278,7 @@ static void _SPSWS_load_weather_data_period(void) {
 static void _SPSWS_store_weather_data_period(uint8_t weather_data_period, uint8_t* configuration_status) {
     // Local variables.
     NVM_status_t nvm_status = NVM_SUCCESS;
+    uint8_t nvm_byte = 0;
     // Set status to success by default.
     (*configuration_status) = 1;
     // Weather data period.
@@ -267,7 +286,8 @@ static void _SPSWS_store_weather_data_period(uint8_t weather_data_period, uint8_
         // Update context.
         spsws_ctx.configuration.weather_data_period = weather_data_period;
         // Write new value in NVM.
-        nvm_status = NVM_write_byte(NVM_ADDRESS_WEATHER_DATA_PERIOD, (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + weather_data_period));
+        nvm_byte = (SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET + weather_data_period);
+        nvm_status = NVM_write(NVM_ADDRESS_WEATHER_DATA_PERIOD, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
     }
     else {
@@ -277,16 +297,131 @@ static void _SPSWS_store_weather_data_period(uint8_t weather_data_period, uint8_
 }
 #endif
 
+#if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
+/*******************************************************************/
+static void _SPSWS_load_lux_uv_index_calibration(void) {
+    // Local variables.
+    NVM_status_t nvm_status = NVM_SUCCESS;
+    uint16_t nvm_short = 0;
+    // Read lux gain numerator.
+    nvm_status = NVM_read(NVM_ADDRESS_LUX_CALIBRATION_GAIN_NUMERATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
+    NVM_stack_error(ERROR_BASE_NVM);
+    // Check value.
+    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+        // Reset to default value.
+        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_DEFAULT;
+        ERROR_stack_add(ERROR_NVM_LUX_CALIBRATION_GAIN_NUMERATOR);
+    }
+    spsws_ctx.configuration.lux_calibration.gain_numerator = nvm_short;
+    // Read lux gain denominator.
+    nvm_short = 0;
+    nvm_status = NVM_read(NVM_ADDRESS_LUX_CALIBRATION_GAIN_DENOMINATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
+    NVM_stack_error(ERROR_BASE_NVM);
+    // Check value.
+    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+        // Reset to default value.
+        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT;
+        ERROR_stack_add(ERROR_NVM_LUX_CALIBRATION_GAIN_DENOMINATOR);
+    }
+    spsws_ctx.configuration.lux_calibration.gain_denominator = nvm_short;
+    // Read uv_index gain numerator.
+    nvm_short = 0;
+    nvm_status = NVM_read(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_NUMERATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
+    NVM_stack_error(ERROR_BASE_NVM);
+    // Check value.
+    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+        // Reset to default value.
+        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_DEFAULT;
+        ERROR_stack_add(ERROR_NVM_UV_INDEX_CALIBRATION_GAIN_NUMERATOR);
+    }
+    spsws_ctx.configuration.uv_index_calibration.gain_numerator = nvm_short;
+    // Read uv_index gain denominator.
+    nvm_short = 0;
+    nvm_status = NVM_read(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
+    NVM_stack_error(ERROR_BASE_NVM);
+    // Check value.
+    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+        // Reset to default value.
+        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT;
+        ERROR_stack_add(ERROR_NVM_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR);
+    }
+    spsws_ctx.configuration.uv_index_calibration.gain_denominator = nvm_short;
+}
+#endif
+
+#if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
+/*******************************************************************/
+static void _SPSWS_store_lux_uv_index_calibration(SPSWS_lux_uv_index_calibration_t* lux_calibration, SPSWS_lux_uv_index_calibration_t* uv_index_calibration, uint8_t* configuration_status) {
+    // Local variables.
+    NVM_status_t nvm_status = NVM_SUCCESS;
+    uint16_t generic_u16 = 0;
+    // Set status to success by default.
+    (*configuration_status) = 1;
+    // Lux gain numerator.
+    generic_u16 = (lux_calibration->gain_numerator);
+    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+        // Update context.
+        spsws_ctx.configuration.lux_calibration.gain_numerator = generic_u16;
+        // Write new value in NVM.
+        nvm_status = NVM_write(NVM_ADDRESS_LUX_CALIBRATION_GAIN_NUMERATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
+        NVM_stack_error(ERROR_BASE_NVM);
+    }
+    else {
+        ERROR_stack_add(ERROR_SIGFOX_EP_DL_LUX_CALIBRATION_GAIN_NUMERATOR);
+        (*configuration_status) = 0;
+    }
+    // Lux gain denominator.
+    generic_u16 = (lux_calibration->gain_denominator);
+    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+        // Update context.
+        spsws_ctx.configuration.lux_calibration.gain_denominator = generic_u16;
+        // Write new value in NVM.
+        nvm_status = NVM_write(NVM_ADDRESS_LUX_CALIBRATION_GAIN_DENOMINATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
+        NVM_stack_error(ERROR_BASE_NVM);
+    }
+    else {
+        ERROR_stack_add(ERROR_SIGFOX_EP_DL_LUX_CALIBRATION_GAIN_DENOMINATOR);
+        (*configuration_status) = 0;
+    }
+    // UV index gain numerator.
+    generic_u16 = (uv_index_calibration->gain_numerator);
+    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+        // Update context.
+        spsws_ctx.configuration.uv_index_calibration.gain_numerator = generic_u16;
+        // Write new value in NVM.
+        nvm_status = NVM_write(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_NUMERATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
+        NVM_stack_error(ERROR_BASE_NVM);
+    }
+    else {
+        ERROR_stack_add(ERROR_SIGFOX_EP_DL_UV_INDEX_CALIBRATION_GAIN_NUMERATOR);
+        (*configuration_status) = 0;
+    }
+    // UV index gain denominator.
+    generic_u16 = (uv_index_calibration->gain_denominator);
+    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+        // Update context.
+        spsws_ctx.configuration.uv_index_calibration.gain_denominator = generic_u16;
+        // Write new value in NVM.
+        nvm_status = NVM_write(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
+        NVM_stack_error(ERROR_BASE_NVM);
+    }
+    else {
+        ERROR_stack_add(ERROR_SIGFOX_EP_DL_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR);
+        (*configuration_status) = 0;
+    }
+}
+#endif
+
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
 static void _SPSWS_measurement_add_sample(SPSWS_measurement_t* measurement, int32_t sample) {
-    /* Update last sample index */
+    // Update last sample index.
     measurement->last_sample_index = (measurement->sample_count);
-    /* Add sample to buffer */
+    // Add sample to buffer.
     measurement->sample_buffer[measurement->sample_count] = sample;
-    /* Increment index */
+    // Increment index .
     (measurement->sample_count)++;
-    /* Manage rollover and flag */
+    // Manage rollover and flag.
     if ((measurement->sample_count) >= SPSWS_MEASUREMENT_BUFFER_SIZE) {
         (measurement->sample_count) = 0;
         (measurement->full_flag) = 1;
@@ -348,6 +483,9 @@ static void _SPSWS_compute_final_measurements(void) {
     SEN15901_status_t sen15901_status = SEN15901_SUCCESS;
     SIGFOX_EP_ul_payload_rainfall_t rainfall;
 #endif
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+    int64_t tmp_s64 = 0;
+#endif
     // Temperature.
     spsws_ctx.sigfox_ep_ul_payload_weather.temperature_tenth_degrees = SIGFOX_EP_ERROR_VALUE_TEMPERATURE;
     sample_count = (spsws_ctx.measurements.temperature_ambiant_tenth_degrees.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.temperature_ambiant_tenth_degrees.sample_count;
@@ -383,6 +521,14 @@ static void _SPSWS_compute_final_measurements(void) {
         math_status = MATH_median_filter(spsws_ctx.measurements.sunshine_light_mlux.sample_buffer, sample_count, (sample_count >> 1), &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            // Apply calibration.
+            if (spsws_ctx.configuration.lux_calibration.gain_denominator != 0) {
+                tmp_s64 = ((((int64_t) generic_s32_1) * ((int64_t) spsws_ctx.configuration.lux_calibration.gain_numerator)));
+                tmp_s64 = ((tmp_s64) / ((int64_t) spsws_ctx.configuration.lux_calibration.gain_denominator));
+                generic_s32_1 = (int32_t) tmp_s64;
+            }
+#endif
             // Clamp value if needed.
             if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_MAX_MLUX) {
                 generic_s32_1 = SIGFOX_EP_SHUNSHINE_LIGHT_MAX_MLUX;
@@ -420,6 +566,14 @@ static void _SPSWS_compute_final_measurements(void) {
         math_status = MATH_max(spsws_ctx.measurements.sunshine_uv_index_duvi.sample_buffer, sample_count, &generic_s32_1);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            // Apply calibration.
+            if (spsws_ctx.configuration.uv_index_calibration.gain_denominator != 0) {
+                tmp_s64 = ((((int64_t) generic_s32_1) * ((int64_t) spsws_ctx.configuration.uv_index_calibration.gain_numerator)));
+                tmp_s64 = ((tmp_s64) / ((int64_t) spsws_ctx.configuration.uv_index_calibration.gain_denominator));
+                generic_s32_1 = (int32_t) tmp_s64;
+            }
+#endif
             // Clamp value.
             if (generic_s32_1 >= SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX) {
                 generic_s32_1 = (SIGFOX_EP_ERROR_VALUE_SUNSHINE_UV_INDEX - 1);
@@ -638,47 +792,35 @@ static void _SPSWS_update_additional_requests(void) {
     rtc_status = RTC_get_time(&current_time);
     RTC_stack_error(ERROR_BASE_RTC);
     // Retrieve last wake-up time from NVM.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 0), &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_WAKE_UP_YEAR, &(previous_wake_up_time.year), 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
-    previous_wake_up_time.year = (nvm_byte << 8);
-    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 1), &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_WAKE_UP_MONTH, &(previous_wake_up_time.month), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    previous_wake_up_time.year |= nvm_byte;
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_MONTH, &(previous_wake_up_time.month));
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_WAKE_UP_DATE, &(previous_wake_up_time.date), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_DATE, &(previous_wake_up_time.date));
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_WAKE_UP_HOUR, &(previous_wake_up_time.hours), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_HOUR, &(previous_wake_up_time.hours));
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_WAKE_UP_MINUTES, &(previous_wake_up_time.minutes));
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_WAKE_UP_MINUTES, &(previous_wake_up_time.minutes), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
     // Update last geolocation time and status.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 0), &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_GEOLOC_YEAR, &(previous_geoloc_time.year), 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
-    previous_geoloc_time.year = (nvm_byte << 8);
-    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 1), &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_GEOLOC_MONTH, &(previous_geoloc_time.month), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    previous_geoloc_time.year |= nvm_byte;
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_GEOLOC_MONTH, &(previous_geoloc_time.month));
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_GEOLOC_DATE, &(previous_geoloc_time.date), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_GEOLOC_DATE, &(previous_geoloc_time.date));
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_GEOLOC_STATUS, &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_GEOLOC_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.status.daily_geoloc = (nvm_byte & 0x01);
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     // Update last downlink time and status.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 0), &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_DOWNLINK_YEAR, &(previous_downlink_time.year), 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
-    previous_downlink_time.year = (nvm_byte << 8);
-    nvm_status = NVM_read_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 1), &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_DOWNLINK_MONTH, &(previous_downlink_time.month), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    previous_downlink_time.year |= nvm_byte;
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_DOWNLINK_MONTH, &(previous_downlink_time.month));
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_DOWNLINK_DATE, &(previous_downlink_time.date), 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_DOWNLINK_DATE, &(previous_downlink_time.date));
-    NVM_stack_error(ERROR_BASE_NVM);
-    nvm_status = NVM_read_byte(NVM_ADDRESS_LAST_DOWNLINK_STATUS, &nvm_byte);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_DOWNLINK_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
     spsws_ctx.status.daily_downlink = (nvm_byte & 0x01);
 #endif
@@ -728,6 +870,7 @@ static void _SPSWS_update_nvm_data(SPSWS_nvm_data_t timestamp_type) {
     NVM_status_t nvm_status = NVM_SUCCESS;
     RTC_status_t rtc_status = RTC_SUCCESS;
     RTC_time_t current_time;
+    uint8_t nvm_byte = 0;
     // Retrieve current time from RTC.
     rtc_status = RTC_get_time(&current_time);
     RTC_stack_error(ERROR_BASE_RTC);
@@ -735,44 +878,40 @@ static void _SPSWS_update_nvm_data(SPSWS_nvm_data_t timestamp_type) {
     switch (timestamp_type) {
     case SPSWS_NVM_DATA_LAST_WAKE_UP:
         // Update last wake-up time.
-        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 0), (uint8_t) (current_time.year >> 8));
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_WAKE_UP_YEAR, &(current_time.year), 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_WAKE_UP_YEAR + 1), (uint8_t) (current_time.year >> 0));
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_WAKE_UP_MONTH, &(current_time.month), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_MONTH, current_time.month);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_WAKE_UP_DATE, &(current_time.date), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_DATE, current_time.date);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_WAKE_UP_HOUR, &(current_time.hours), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_HOUR, current_time.hours);
-        NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_WAKE_UP_MINUTES, current_time.minutes);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_WAKE_UP_MINUTES, &(current_time.minutes), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
     case SPSWS_NVM_DATA_LAST_GEOLOC:
         // Update last geoloc time and status.
-        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 0), (uint8_t) (current_time.year >> 8));
+        nvm_byte = (uint8_t) (spsws_ctx.status.daily_geoloc);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_YEAR, &(current_time.year), 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_GEOLOC_YEAR + 1), (uint8_t) (current_time.year >> 0));
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_MONTH, &(current_time.month), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_GEOLOC_MONTH, current_time.month);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_DATE, &(current_time.date), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_GEOLOC_DATE, current_time.date);
-        NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_GEOLOC_STATUS, (uint8_t) (spsws_ctx.status.daily_geoloc));
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     case SPSWS_NVM_DATA_LAST_DOWNLINK:
         // Update last downlink time and status.
-        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 0), (uint8_t) (current_time.year >> 8));
+        nvm_byte = (uint8_t) (spsws_ctx.status.daily_downlink);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_YEAR, &(current_time.year), 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte((NVM_ADDRESS_LAST_DOWNLINK_YEAR + 1), (uint8_t) (current_time.year >> 0));
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_MONTH, &(current_time.month), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_DOWNLINK_MONTH, current_time.month);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_DATE, &(current_time.date), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_DOWNLINK_DATE, current_time.date);
-        NVM_stack_error(ERROR_BASE_NVM);
-        nvm_status = NVM_write_byte(NVM_ADDRESS_LAST_DOWNLINK_STATUS, (uint8_t) (spsws_ctx.status.daily_downlink));
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
 #endif
@@ -818,6 +957,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SIGFOX_EP_dl_payload_t dl_payload;
     int16_t dl_rssi = 0;
     RTC_time_t rtc_time;
+    SPSWS_lux_uv_index_calibration_t lux_calibration;
+    SPSWS_lux_uv_index_calibration_t uv_index_calibration;
     uint8_t configuration_status = 0;
 #endif
     // Directly exit of the radio is disabled due to low supercap voltage.
@@ -872,6 +1013,15 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     rtc_time.seconds = dl_payload.set_date_time.seconds;
                     // Update RTC.
                     _SPSWS_set_date_time(&rtc_time, &configuration_status);
+                    break;
+                case SIGFOX_EP_DL_OP_CODE_SET_LUX_UV_INDEX_CALIBRATION:
+                    // Build input structures.
+                    lux_calibration.gain_numerator = dl_payload.set_lux_uv_index_calibration.lux_gain_numerator;
+                    lux_calibration.gain_denominator = dl_payload.set_lux_uv_index_calibration.lux_gain_denominator;
+                    uv_index_calibration.gain_numerator = dl_payload.set_lux_uv_index_calibration.uv_index_gain_numerator;
+                    uv_index_calibration.gain_denominator = dl_payload.set_lux_uv_index_calibration.uv_index_gain_denominator;
+                    // Check and store new configuration.
+                    _SPSWS_store_lux_uv_index_calibration(&lux_calibration, &uv_index_calibration, &configuration_status);
                     break;
                 default:
                     ERROR_stack_add(ERROR_SIGFOX_EP_DL_OP_CODE);
@@ -971,7 +1121,7 @@ static void _SPSWS_init_hw(void) {
 #endif
     RTC_stack_error(ERROR_BASE_RTC);
     // Read LS byte of the device ID to add a random delay in RTC alarm.
-    nvm_status = NVM_read_byte((NVM_ADDRESS_SIGFOX_EP_ID + SIGFOX_EP_ID_SIZE_BYTES - 1), &device_id_lsbyte);
+    nvm_status = NVM_read((NVM_ADDRESS_SIGFOX_EP_ID + SIGFOX_EP_ID_SIZE_BYTES - 1), &device_id_lsbyte, 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
 #ifndef SPSWS_MODE_CLI
     // Init RTC alarm.
@@ -1009,10 +1159,12 @@ static void _SPSWS_init_hw(void) {
     // Init SEN15901 emulator synchronization pin.
     GPIO_configure(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, GPIO_MODE_OUTPUT, GPIO_TYPE_PUSH_PULL, GPIO_SPEED_LOW, GPIO_PULL_NONE);
 #endif
-#ifdef SIGFOX_EP_BIDIRECTIONAL
+#if ((defined SIGFOX_EP_BIDIRECTIONAL) && !(defined SPSWS_MODE_CLI))
     // Load configuration from NVM.
     _SPSWS_load_weather_data_period();
     _SPSWS_store_weather_data_period(spsws_ctx.configuration.weather_data_period, &device_id_lsbyte);
+    _SPSWS_load_lux_uv_index_calibration();
+    _SPSWS_store_lux_uv_index_calibration(&(spsws_ctx.configuration.lux_calibration), &(spsws_ctx.configuration.uv_index_calibration), &device_id_lsbyte);
 #endif
 }
 

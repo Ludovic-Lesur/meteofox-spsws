@@ -161,13 +161,6 @@ ANALOG_status_t ANALOG_convert_channel(ANALOG_channel_t channel, int32_t* analog
         // Convert to mV.
         (*analog_data) = (adc_data_12bits * ANALOG_REF191_VOLTAGE_MV * ANALOG_DIVIDER_RATIO_STORAGE_VOLTAGE_NUM) / (analog_ctx.ref191_voltage_12bits * ANALOG_DIVIDER_RATIO_STORAGE_VOLTAGE_DEN);
         break;
-    case ANALOG_CHANNEL_SUNSHINE_LIGHT_PERCENT:
-        // Light sensor.
-        status = _ANALOG_convert_max11136_channel(ANALOG_MAX11136_CHANNEL_SUNSHINE_LIGHT, &adc_data_12bits);
-        if (status != ANALOG_SUCCESS) goto errors;
-        // Convert to percent.
-        (*analog_data) = (adc_data_12bits * 100) / (MAX111XX_FULL_SCALE);
-        break;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
     case ANALOG_CHANNEL_WIND_DIRECTION_RATIO_PERMILLE:
         // Wind vane direction.
