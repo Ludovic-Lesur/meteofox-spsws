@@ -54,6 +54,10 @@
 #define SPSWS_POWER_ON_DELAY_MS                                 7000
 #define SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS                   180
 #define SPSWS_GEOLOC_TIMEOUT_SECONDS                            120
+// NVM flags
+#define SPSWS_FLAG_MIN                                          0
+#define SPSWS_FLAG_MAX                                          1
+#define SPSWS_FLAG_NVM_OFFSET                                   0x55
 // Weather data period.
 #define SPSWS_WEATHER_DATA_PERIOD_MIN                           SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES
 #define SPSWS_WEATHER_DATA_PERIOD_DEFAULT                       SIGFOX_EP_DL_WEATHER_DATA_PERIOD_60_MINUTES
@@ -811,7 +815,10 @@ static void _SPSWS_update_additional_requests(void) {
     NVM_stack_error(ERROR_BASE_NVM);
     nvm_status = NVM_read(NVM_ADDRESS_LAST_GEOLOC_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    spsws_ctx.status.daily_geoloc = (nvm_byte & 0x01);
+    if ((nvm_byte < (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MIN)) || (nvm_byte > (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MAX))) {
+        nvm_byte = (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MIN);
+    }
+    spsws_ctx.status.daily_geoloc = (nvm_byte - SPSWS_FLAG_NVM_OFFSET);
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     // Update last downlink time and status.
     nvm_status = NVM_read(NVM_ADDRESS_LAST_DOWNLINK_YEAR, &(previous_downlink_time.year), 1, NVM_DATA_TYPE_SHORT);
@@ -822,7 +829,16 @@ static void _SPSWS_update_additional_requests(void) {
     NVM_stack_error(ERROR_BASE_NVM);
     nvm_status = NVM_read(NVM_ADDRESS_LAST_DOWNLINK_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
     NVM_stack_error(ERROR_BASE_NVM);
-    spsws_ctx.status.daily_downlink = (nvm_byte & 0x01);
+    if ((nvm_byte < (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MIN)) || (nvm_byte > (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MAX))) {
+        nvm_byte = (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MIN);
+    }
+    spsws_ctx.status.daily_downlink = (nvm_byte - SPSWS_FLAG_NVM_OFFSET);
+    nvm_status = NVM_read(NVM_ADDRESS_LAST_CONFIGURATION_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
+    NVM_stack_error(ERROR_BASE_NVM);
+    if ((nvm_byte < (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MIN)) || (nvm_byte > (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MAX))) {
+        nvm_byte = (SPSWS_FLAG_NVM_OFFSET + SPSWS_FLAG_MIN);
+    }
+    spsws_ctx.status.configuration_updated = (nvm_byte - SPSWS_FLAG_NVM_OFFSET);
 #endif
     // Reset valid wakeup flag.
     spsws_ctx.flags.valid_wakeup = 0;
@@ -891,27 +907,31 @@ static void _SPSWS_update_nvm_data(SPSWS_nvm_data_t timestamp_type) {
         break;
     case SPSWS_NVM_DATA_LAST_GEOLOC:
         // Update last geoloc time and status.
-        nvm_byte = (uint8_t) (spsws_ctx.status.daily_geoloc);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_YEAR, &(current_time.year), 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_MONTH, &(current_time.month), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_DATE, &(current_time.date), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
+        nvm_byte = (uint8_t) (spsws_ctx.status.daily_geoloc + SPSWS_FLAG_NVM_OFFSET);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_GEOLOC_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
     case SPSWS_NVM_DATA_LAST_DOWNLINK:
         // Update last downlink time and status.
-        nvm_byte = (uint8_t) (spsws_ctx.status.daily_downlink);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_YEAR, &(current_time.year), 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_MONTH, &(current_time.month), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_DATE, &(current_time.date), 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
+        nvm_byte = (uint8_t) (spsws_ctx.status.daily_downlink + SPSWS_FLAG_NVM_OFFSET);
         nvm_status = NVM_write(NVM_ADDRESS_LAST_DOWNLINK_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
+        NVM_stack_error(ERROR_BASE_NVM);
+        // Update configuration status.
+        nvm_byte = (uint8_t) (spsws_ctx.status.configuration_updated + SPSWS_FLAG_NVM_OFFSET);
+        nvm_status = NVM_write(NVM_ADDRESS_LAST_CONFIGURATION_STATUS, &nvm_byte, 1, NVM_DATA_TYPE_BYTE);
         NVM_stack_error(ERROR_BASE_NVM);
         break;
 #endif
@@ -1029,10 +1049,10 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                 }
             }
         }
-        // Update timestamp.
-        _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_DOWNLINK);
         // Update status.
         spsws_ctx.status.configuration_updated = (configuration_status == 0) ? 0 : 1;
+        // Store timestamp and status in NVM.
+        _SPSWS_update_nvm_data(SPSWS_NVM_DATA_LAST_DOWNLINK);
         // Clear request.
         spsws_ctx.flags.downlink_request = 0;
     }
