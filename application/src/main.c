@@ -52,8 +52,8 @@
 
 // Timing.
 #define SPSWS_POWER_ON_DELAY_MS                                 7000
-#define SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS                   180
-#define SPSWS_GEOLOC_TIMEOUT_SECONDS                            120
+#define SPSWS_RTC_CALIBRATION_TIMEOUT_SECONDS                   (3 * MATH_SECONDS_PER_MINUTE)
+#define SPSWS_GEOLOC_TIMEOUT_SECONDS                            (2 * MATH_SECONDS_PER_MINUTE)
 // NVM flags
 #define SPSWS_FLAG_MIN                                          0
 #define SPSWS_FLAG_MAX                                          1
@@ -77,14 +77,11 @@
 #define SPSWS_WEATHER_REQUEST_OFF_STORAGE_VOLTAGE_THRESHOLD_MV  1500
 #define SPSWS_WEATHER_REQUEST_ON_STORAGE_VOLTAGE_THRESHOLD_MV   2000
 // Measurements buffers length.
-#define SPSWS_MEASUREMENT_PERIOD_SECONDS                        MATH_SECONDS_PER_MINUTE
+#define SPSWS_MEASUREMENT_PERIOD_SECONDS                        (1 * MATH_SECONDS_PER_MINUTE)
 #define SPSWS_MEASUREMENT_BUFFER_SIZE                           (MATH_SECONDS_PER_HOUR / SPSWS_MEASUREMENT_PERIOD_SECONDS)
 #ifdef SPSWS_SEN15901_EMULATOR
 #define SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO                    GPIO_DIO4
 #endif
-// Sigfox oscillator accuracy.
-#define SPSWS_SIGFOX_RC1_EPSILON_SNW_HZ                         1410
-#define SPSWS_SIGFOX_RC1_EPSILON_EP_HZ                          4340
 
 /*** SPSWS structures ***/
 
@@ -217,7 +214,14 @@ typedef struct {
 /*** SPSWS global variables ***/
 
 #if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
-static uint32_t SPSWS_WEATHER_DATA_PERIOD_SECONDS[SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST] = { 3600, 1800, 1200, 900, 720, 600 };
+static uint32_t SPSWS_WEATHER_DATA_PERIOD_SECONDS[SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST] = {
+    (MATH_SECONDS_PER_HOUR / 1),
+    (MATH_SECONDS_PER_HOUR / 2),
+    (MATH_SECONDS_PER_HOUR / 3),
+    (MATH_SECONDS_PER_HOUR / 4),
+    (MATH_SECONDS_PER_HOUR / 5),
+    (MATH_SECONDS_PER_HOUR / 6)
+};
 #endif
 #ifndef SPSWS_MODE_CLI
 static SPSWS_context_t spsws_ctx;
@@ -1153,7 +1157,7 @@ static void _SPSWS_init_hw(void) {
     rtc_alarm_config.minutes.mask = 0;
     rtc_alarm_config.minutes.value = 0;
     rtc_alarm_config.seconds.mask = 0;
-    rtc_alarm_config.seconds.value = (device_id_lsbyte % 60);
+    rtc_alarm_config.seconds.value = (device_id_lsbyte % MATH_SECONDS_PER_MINUTE);
     rtc_status = RTC_start_alarm(RTC_ALARM_A, &rtc_alarm_config, &_SPSWS_sharp_hour_alarm_callback);
     RTC_stack_error(ERROR_BASE_RTC);
 #endif
@@ -1591,7 +1595,7 @@ int main(void) {
                 // Get current period.
                 generic_u32_2 = SPSWS_WEATHER_DATA_PERIOD_SECONDS[spsws_ctx.configuration.weather_data_period];
                 // Check weather period.
-                if ((generic_u32_1 >= (spsws_ctx.weather_last_time_seconds + generic_u32_2)) && (spsws_ctx.weather_message_count < (3600 / generic_u32_2))) {
+                if ((generic_u32_1 >= (spsws_ctx.weather_last_time_seconds + generic_u32_2)) && (spsws_ctx.weather_message_count < (MATH_SECONDS_PER_HOUR / generic_u32_2))) {
                     // Set request and update last time.
                     spsws_ctx.flags.weather_request = spsws_ctx.flags.weather_request_enabled;
                     spsws_ctx.flags.weather_request_intermediate = 1;
