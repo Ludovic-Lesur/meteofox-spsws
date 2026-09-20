@@ -448,7 +448,7 @@ static void _SPSWS_reset_measurements(void) {
     spsws_ctx.measurements.sunshine_light_mlux.sample_count = 0;
     spsws_ctx.measurements.sunshine_light_mlux.full_flag = 0;
     spsws_ctx.measurements.sunshine_uv_index_duvi.sample_count = 0;
-    spsws_ctx.measurements.sunshine_light_mlux.full_flag = 0;
+    spsws_ctx.measurements.sunshine_uv_index_duvi.full_flag = 0;
     spsws_ctx.measurements.pressure_atmospheric_absolute_pa.sample_count = 0;
     spsws_ctx.measurements.pressure_atmospheric_absolute_pa.full_flag = 0;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
