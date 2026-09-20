@@ -1279,9 +1279,8 @@ int main(void) {
             break;
         case SPSWS_STATE_MEASURE:
             IWDG_reload();
-            // Note: digital sensors must also be powered at this step to read the LDR.
+            // Turn analog front-end on.
             POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_ANALOG, LPTIM_DELAY_MODE_SLEEP);
-            POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
             // MCU voltage.
             analog_status = ANALOG_convert_channel(ANALOG_CHANNEL_MCU_VOLTAGE_MV, &generic_s32_1);
             ANALOG_stack_error(ERROR_BASE_ANALOG);
@@ -1320,7 +1319,10 @@ int main(void) {
                     spsws_ctx.flags.weather_request_enabled = 1;
                 }
             }
+            // Turn analog front-end off.
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_ANALOG);
+            // Turn digital sensors on.
+            POWER_enable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_SENSORS, LPTIM_DELAY_MODE_SLEEP);
             // Internal temperature/humidity sensor.
             sht3x_status = SHT3X_get_temperature_humidity(I2C_ADDRESS_SHT30_INTERNAL, &generic_s32_1, &generic_s32_2);
             SHT3X_stack_error(ERROR_BASE_SHT30_INTERNAL);
@@ -1362,6 +1364,7 @@ int main(void) {
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_light_mlux), generic_s32_1);
                 _SPSWS_measurement_add_sample(&(spsws_ctx.measurements.sunshine_uv_index_duvi), generic_s32_2);
             }
+            // Turn digital sensors off.
             POWER_disable(POWER_REQUESTER_ID_MAIN, POWER_DOMAIN_SENSORS);
             // Clear flag.
             spsws_ctx.flags.measure_request = 0;
