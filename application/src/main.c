@@ -1273,13 +1273,8 @@ int main(void) {
             // Clear reset flags.
             PWR_clear_reset_flags();
             // Send startup message.
-            application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
             application_message.ul_payload = (sfx_u8*) (sigfox_ep_ul_payload_startup.frame);
             application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_STARTUP;
-#ifdef SIGFOX_EP_BIDIRECTIONAL
-            application_message.common_parameters.number_of_frames = 3;
-            application_message.bidirectional_flag = SIGFOX_FALSE;
-#endif
             _SPSWS_send_sigfox_message(&application_message);
             // Perform first RTC calibration.
             spsws_ctx.state = SPSWS_STATE_RTC_CALIBRATION;
