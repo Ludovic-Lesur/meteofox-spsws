@@ -141,17 +141,18 @@ typedef union {
 typedef struct {
     int32_t sample_buffer[SPSWS_MEASUREMENT_BUFFER_SIZE];
     uint32_t sample_count;
-    uint32_t last_sample_index;
     uint8_t full_flag;
 } SPSWS_measurement_t;
 
 /*******************************************************************/
 typedef struct {
+    // Weather data
     SPSWS_measurement_t temperature_ambiant_tenth_degrees;
     SPSWS_measurement_t humidity_ambiant_percent;
     SPSWS_measurement_t sunshine_light_mlux;
     SPSWS_measurement_t sunshine_uv_index_duvi;
     SPSWS_measurement_t pressure_atmospheric_absolute_pa;
+    // Monitoring data.
     SPSWS_measurement_t temperature_pcb_tenth_degrees;
     SPSWS_measurement_t humidity_pcb_percent;
     SPSWS_measurement_t source_voltage_mv;
@@ -423,8 +424,6 @@ static void _SPSWS_store_lux_uv_index_calibration(SPSWS_lux_uv_index_calibration
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
 static void _SPSWS_measurement_add_sample(SPSWS_measurement_t* measurement, int32_t sample) {
-    // Update last sample index.
-    measurement->last_sample_index = (measurement->sample_count);
     // Add sample to buffer.
     measurement->sample_buffer[measurement->sample_count] = sample;
     // Increment index .
@@ -439,18 +438,27 @@ static void _SPSWS_measurement_add_sample(SPSWS_measurement_t* measurement, int3
 
 #ifndef SPSWS_MODE_CLI
 /*******************************************************************/
+static void _SPSWS_reset_measurement(SPSWS_measurement_t* measurement) {
+    // Local variables.
+    uint8_t idx = 0;
+    // Reset structure.
+    for (idx = 0; idx < SPSWS_MEASUREMENT_BUFFER_SIZE; idx++) {
+        measurement->sample_buffer[idx] = 0;
+    }
+    measurement->full_flag = 0;
+    measurement->sample_count = 0;
+}
+#endif
+
+#ifndef SPSWS_MODE_CLI
+/*******************************************************************/
 static void _SPSWS_reset_measurements(void) {
     // Weather data
-    spsws_ctx.measurements.temperature_ambiant_tenth_degrees.sample_count = 0;
-    spsws_ctx.measurements.temperature_ambiant_tenth_degrees.full_flag = 0;
-    spsws_ctx.measurements.humidity_ambiant_percent.sample_count = 0;
-    spsws_ctx.measurements.humidity_ambiant_percent.full_flag = 0;
-    spsws_ctx.measurements.sunshine_light_mlux.sample_count = 0;
-    spsws_ctx.measurements.sunshine_light_mlux.full_flag = 0;
-    spsws_ctx.measurements.sunshine_uv_index_duvi.sample_count = 0;
-    spsws_ctx.measurements.sunshine_uv_index_duvi.full_flag = 0;
-    spsws_ctx.measurements.pressure_atmospheric_absolute_pa.sample_count = 0;
-    spsws_ctx.measurements.pressure_atmospheric_absolute_pa.full_flag = 0;
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.temperature_ambiant_tenth_degrees);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.humidity_ambiant_percent);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.sunshine_light_mlux);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.sunshine_uv_index_duvi);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.pressure_atmospheric_absolute_pa);
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ULTIMETER_reset_measurements();
@@ -458,16 +466,12 @@ static void _SPSWS_reset_measurements(void) {
     SEN15901_reset_measurements();
 #endif
     // Monitoring data.
-    spsws_ctx.measurements.mcu_temperature_degrees.sample_count = 0;
-    spsws_ctx.measurements.mcu_temperature_degrees.full_flag = 0;
-    spsws_ctx.measurements.temperature_pcb_tenth_degrees.sample_count = 0;
-    spsws_ctx.measurements.temperature_pcb_tenth_degrees.full_flag = 0;
-    spsws_ctx.measurements.humidity_pcb_percent.sample_count = 0;
-    spsws_ctx.measurements.humidity_pcb_percent.full_flag = 0;
-    spsws_ctx.measurements.source_voltage_mv.sample_count = 0;
-    spsws_ctx.measurements.source_voltage_mv.full_flag = 0;
-    spsws_ctx.measurements.mcu_voltage_mv.sample_count = 0;
-    spsws_ctx.measurements.mcu_voltage_mv.full_flag = 0;
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.temperature_pcb_tenth_degrees);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.humidity_pcb_percent);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.source_voltage_mv);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.storage_voltage_mv);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.mcu_temperature_degrees);
+    _SPSWS_reset_measurement(&spsws_ctx.measurements.mcu_voltage_mv);
 }
 #endif
 
@@ -640,10 +644,10 @@ static void _SPSWS_compute_final_measurements(void) {
     }
     // Supercap voltage.
     spsws_ctx.sigfox_ep_ul_payload_monitoring.storage_voltage_mv = SIGFOX_EP_ERROR_VALUE_STORAGE_VOLTAGE;
-    sample_count = (spsws_ctx.measurements.storage_voltage_mv.full_flag != 0) ? SPSWS_MEASUREMENT_BUFFER_SIZE : spsws_ctx.measurements.storage_voltage_mv.sample_count;
-    if (sample_count > 0) {
+    if ((spsws_ctx.measurements.storage_voltage_mv.sample_count > 0) || (spsws_ctx.measurements.storage_voltage_mv.full_flag != 0)) {
         // Select last value.
-        spsws_ctx.sigfox_ep_ul_payload_monitoring.storage_voltage_mv = (uint16_t) spsws_ctx.measurements.storage_voltage_mv.sample_buffer[spsws_ctx.measurements.storage_voltage_mv.last_sample_index];
+        sample_count = ((spsws_ctx.measurements.storage_voltage_mv.sample_count + (SPSWS_MEASUREMENT_BUFFER_SIZE - 1)) % SPSWS_MEASUREMENT_BUFFER_SIZE);
+        spsws_ctx.sigfox_ep_ul_payload_monitoring.storage_voltage_mv = (uint16_t) spsws_ctx.measurements.storage_voltage_mv.sample_buffer[sample_count];
     }
     // MCU voltage.
     spsws_ctx.sigfox_ep_ul_payload_monitoring.mcu_voltage_mv = SIGFOX_EP_ERROR_VALUE_MCU_VOLTAGE;
