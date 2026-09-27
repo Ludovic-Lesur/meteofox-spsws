@@ -485,6 +485,7 @@ static void _SPSWS_compute_final_measurements(void) {
     int32_t generic_s32_1 = 0;
     int32_t generic_s32_2 = 0;
     uint32_t generic_u32 = 0;
+    uint8_t unit = 0;
 #ifdef SPSWS_WIND_RAINFALL_MEASUREMENTS
 #ifdef SPSWS_WIND_VANE_ULTIMETER
     ULTIMETER_status_t ultimeter_status = ULTIMETER_SUCCESS;
@@ -548,23 +549,24 @@ static void _SPSWS_compute_final_measurements(void) {
             // Check range.
             if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_HIGH_MLUX) {
                 // Unit in ten lux.
-                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TEN_LUX;
+                unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TEN_LUX;
             }
             else if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_MIDDLE_MLUX) {
                 // Unit in lux.
-                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_LUX;
+                unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_LUX;
             }
             else if (generic_s32_1 > SIGFOX_EP_SHUNSHINE_LIGHT_UNIT_THRESHOLD_LOW_MLUX) {
                 // Unit in tenth of lux.
-                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TENTH_LUX;
+                unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_TENTH_LUX;
             }
             else {
                 // Unit in hundredth of lux.
-                sunshine_light.unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_HUNDREDTH_LUX;
+                unit = SIGFOX_EP_UL_PAYLOAD_SUNSHINE_LIGHT_UNIT_HUNDREDTH_LUX;
             }
-            math_status = MATH_rounded_division(generic_s32_1, (int32_t) MATH_POWER_10[sunshine_light.unit + 1], &generic_s32_2);
+            math_status = MATH_rounded_division(generic_s32_1, (int32_t) MATH_POWER_10[unit + 1], &generic_s32_2);
             MATH_stack_error(ERROR_BASE_MATH);
             if (math_status == MATH_SUCCESS) {
+                sunshine_light.unit = unit;
                 sunshine_light.value = generic_s32_2;
             }
         }
@@ -729,15 +731,16 @@ static void _SPSWS_compute_final_measurements(void) {
         // Check range.
         if (generic_s32_1 > SIGFOX_EP_RAINFALL_UNIT_THRESHOLD_UM) {
             // Unit in millimeter.
-            rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM;
+            unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_MM;
         }
         else {
             // Unit in tenth of millimeter.
-            rainfall.unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_TENTH_MM;
+            unit = SIGFOX_EP_UL_PAYLOAD_RAINFALL_UNIT_TENTH_MM;
         }
-        math_status = MATH_rounded_division(generic_s32_1, (int32_t) MATH_POWER_10[rainfall.unit + 2], &generic_s32_2);
+        math_status = MATH_rounded_division(generic_s32_1, (int32_t) MATH_POWER_10[unit + 2], &generic_s32_2);
         MATH_stack_error(ERROR_BASE_MATH);
         if (math_status == MATH_SUCCESS) {
+            rainfall.unit = unit;
             rainfall.value = generic_s32_2;
         }
     }
