@@ -64,14 +64,14 @@
 #define SPSWS_WEATHER_DATA_PERIOD_MAX                           (SIGFOX_EP_DL_WEATHER_DATA_PERIOD_LAST - 1)
 #define SPSWS_WEATHER_DATA_PERIOD_NVM_OFFSET                    0x55
 // Lux and UV index calibration.
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN       1
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_DEFAULT   1
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX       4095
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN     1
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT 1
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX     4095
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MIN           1
-#define SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MAX           168
+#define SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MIN            1
+#define SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_DEFAULT        1
+#define SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MAX            4095
+#define SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MIN          1
+#define SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_DEFAULT      1
+#define SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MAX          4095
+#define SPSWS_LUX_UVI_CALIBRATION_TIME_HOURS_MIN                1
+#define SPSWS_LUX_UVI_CALIBRATION_TIME_HOURS_MAX                168
 // Voltage hysteresis for radio.
 #define SPSWS_RADIO_OFF_STORAGE_VOLTAGE_THRESHOLD_MV            1000
 #define SPSWS_RADIO_ON_STORAGE_VOLTAGE_THRESHOLD_MV             1500
@@ -121,7 +121,7 @@ typedef union {
 typedef union {
     uint16_t all;
     struct {
-        unsigned lux_uv_index_calibration_pending :1;
+        unsigned lux_uvi_calibration_pending :1;
         unsigned sen15901_process :1;
         unsigned radio_enabled : 1;
         unsigned reset_request : 1;
@@ -173,13 +173,13 @@ typedef enum {
 } SPSWS_nvm_data_t;
 
 /*!******************************************************************
- * \struct SPSWS_lux_uv_index_calibration_t
+ * \struct SPSWS_lux_uvi_calibration_t
  * \brief Light sensor calibration parameters.
  *******************************************************************/
 typedef struct {
     uint16_t gain_numerator;
     uint16_t gain_denominator;
-} SPSWS_lux_uv_index_calibration_t;
+} SPSWS_lux_uvi_calibration_t;
 
 /*!******************************************************************
  * \struct SPSWS_configuration_t
@@ -187,8 +187,8 @@ typedef struct {
  *******************************************************************/
 typedef struct {
     uint8_t weather_data_period;
-    SPSWS_lux_uv_index_calibration_t lux_calibration;
-    SPSWS_lux_uv_index_calibration_t uv_index_calibration;
+    SPSWS_lux_uvi_calibration_t lux_calibration;
+    SPSWS_lux_uvi_calibration_t uvi_calibration;
 } SPSWS_configuration_t;
 
 /*******************************************************************/
@@ -212,8 +212,8 @@ typedef struct {
     volatile uint32_t sharp_hour_uptime;
     uint32_t weather_message_count;
     uint32_t weather_last_time_seconds;
-    uint32_t lux_uv_index_calibration_start_time_seconds;
-    uint32_t lux_uv_index_calibration_time_seconds;
+    uint32_t lux_uvi_calibration_start_time_seconds;
+    uint32_t lux_uvi_calibration_time_seconds;
 #endif
 } SPSWS_context_t;
 
@@ -313,7 +313,7 @@ static void _SPSWS_store_weather_data_period(uint8_t weather_data_period, uint8_
 
 #if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
 /*******************************************************************/
-static void _SPSWS_load_lux_uv_index_calibration(void) {
+static void _SPSWS_load_lux_uvi_calibration(void) {
     // Local variables.
     NVM_status_t nvm_status = NVM_SUCCESS;
     uint16_t nvm_short = 0;
@@ -321,9 +321,9 @@ static void _SPSWS_load_lux_uv_index_calibration(void) {
     nvm_status = NVM_read(NVM_ADDRESS_LUX_CALIBRATION_GAIN_NUMERATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
     // Check value.
-    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+    if ((nvm_short < SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MIN) || (nvm_short > SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MAX)) {
         // Reset to default value.
-        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_DEFAULT;
+        nvm_short = SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_DEFAULT;
         ERROR_stack_add(ERROR_NVM_LUX_CALIBRATION_GAIN_NUMERATOR);
     }
     spsws_ctx.configuration.lux_calibration.gain_numerator = nvm_short;
@@ -332,40 +332,40 @@ static void _SPSWS_load_lux_uv_index_calibration(void) {
     nvm_status = NVM_read(NVM_ADDRESS_LUX_CALIBRATION_GAIN_DENOMINATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
     // Check value.
-    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+    if ((nvm_short < SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MIN) || (nvm_short > SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
         // Reset to default value.
-        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT;
+        nvm_short = SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_DEFAULT;
         ERROR_stack_add(ERROR_NVM_LUX_CALIBRATION_GAIN_DENOMINATOR);
     }
     spsws_ctx.configuration.lux_calibration.gain_denominator = nvm_short;
     // Read uv_index gain numerator.
     nvm_short = 0;
-    nvm_status = NVM_read(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_NUMERATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
+    nvm_status = NVM_read(NVM_ADDRESS_UVI_CALIBRATION_GAIN_NUMERATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
     // Check value.
-    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+    if ((nvm_short < SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MIN) || (nvm_short > SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MAX)) {
         // Reset to default value.
-        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_DEFAULT;
-        ERROR_stack_add(ERROR_NVM_UV_INDEX_CALIBRATION_GAIN_NUMERATOR);
+        nvm_short = SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_DEFAULT;
+        ERROR_stack_add(ERROR_NVM_UVI_CALIBRATION_GAIN_NUMERATOR);
     }
-    spsws_ctx.configuration.uv_index_calibration.gain_numerator = nvm_short;
+    spsws_ctx.configuration.uvi_calibration.gain_numerator = nvm_short;
     // Read uv_index gain denominator.
     nvm_short = 0;
-    nvm_status = NVM_read(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
+    nvm_status = NVM_read(NVM_ADDRESS_UVI_CALIBRATION_GAIN_DENOMINATOR, &nvm_short, 1, NVM_DATA_TYPE_SHORT);
     NVM_stack_error(ERROR_BASE_NVM);
     // Check value.
-    if ((nvm_short < SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (nvm_short > SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+    if ((nvm_short < SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MIN) || (nvm_short > SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
         // Reset to default value.
-        nvm_short = SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT;
-        ERROR_stack_add(ERROR_NVM_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR);
+        nvm_short = SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_DEFAULT;
+        ERROR_stack_add(ERROR_NVM_UVI_CALIBRATION_GAIN_DENOMINATOR);
     }
-    spsws_ctx.configuration.uv_index_calibration.gain_denominator = nvm_short;
+    spsws_ctx.configuration.uvi_calibration.gain_denominator = nvm_short;
 }
 #endif
 
 #if (!(defined SPSWS_MODE_CLI) && (defined SIGFOX_EP_BIDIRECTIONAL))
 /*******************************************************************/
-static void _SPSWS_store_lux_uv_index_calibration(SPSWS_lux_uv_index_calibration_t* lux_calibration, SPSWS_lux_uv_index_calibration_t* uv_index_calibration, uint8_t* configuration_status) {
+static void _SPSWS_store_lux_uvi_calibration(SPSWS_lux_uvi_calibration_t* lux_calibration, SPSWS_lux_uvi_calibration_t* uvi_calibration, uint8_t* configuration_status) {
     // Local variables.
     NVM_status_t nvm_status = NVM_SUCCESS;
     uint16_t generic_u16 = 0;
@@ -373,7 +373,7 @@ static void _SPSWS_store_lux_uv_index_calibration(SPSWS_lux_uv_index_calibration
     (*configuration_status) = 1;
     // Lux gain numerator.
     generic_u16 = (lux_calibration->gain_numerator);
-    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+    if ((generic_u16 >= SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MIN) || (generic_u16 <= SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MAX)) {
         // Update context.
         spsws_ctx.configuration.lux_calibration.gain_numerator = generic_u16;
         // Write new value in NVM.
@@ -386,7 +386,7 @@ static void _SPSWS_store_lux_uv_index_calibration(SPSWS_lux_uv_index_calibration
     }
     // Lux gain denominator.
     generic_u16 = (lux_calibration->gain_denominator);
-    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+    if ((generic_u16 >= SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MIN) || (generic_u16 <= SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
         // Update context.
         spsws_ctx.configuration.lux_calibration.gain_denominator = generic_u16;
         // Write new value in NVM.
@@ -398,29 +398,29 @@ static void _SPSWS_store_lux_uv_index_calibration(SPSWS_lux_uv_index_calibration
         (*configuration_status) = 0;
     }
     // UV index gain numerator.
-    generic_u16 = (uv_index_calibration->gain_numerator);
-    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_NUMERATOR_MAX)) {
+    generic_u16 = (uvi_calibration->gain_numerator);
+    if ((generic_u16 >= SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MIN) || (generic_u16 <= SPSWS_LUX_UVI_CALIBRATION_GAIN_NUMERATOR_MAX)) {
         // Update context.
-        spsws_ctx.configuration.uv_index_calibration.gain_numerator = generic_u16;
+        spsws_ctx.configuration.uvi_calibration.gain_numerator = generic_u16;
         // Write new value in NVM.
-        nvm_status = NVM_write(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_NUMERATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
+        nvm_status = NVM_write(NVM_ADDRESS_UVI_CALIBRATION_GAIN_NUMERATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
     }
     else {
-        ERROR_stack_add(ERROR_SIGFOX_EP_DL_UV_INDEX_CALIBRATION_GAIN_NUMERATOR);
+        ERROR_stack_add(ERROR_SIGFOX_EP_DL_UVI_CALIBRATION_GAIN_NUMERATOR);
         (*configuration_status) = 0;
     }
     // UV index gain denominator.
-    generic_u16 = (uv_index_calibration->gain_denominator);
-    if ((generic_u16 >= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN) || (generic_u16 <= SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
+    generic_u16 = (uvi_calibration->gain_denominator);
+    if ((generic_u16 >= SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MIN) || (generic_u16 <= SPSWS_LUX_UVI_CALIBRATION_GAIN_DENOMINATOR_MAX)) {
         // Update context.
-        spsws_ctx.configuration.uv_index_calibration.gain_denominator = generic_u16;
+        spsws_ctx.configuration.uvi_calibration.gain_denominator = generic_u16;
         // Write new value in NVM.
-        nvm_status = NVM_write(NVM_ADDRESS_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
+        nvm_status = NVM_write(NVM_ADDRESS_UVI_CALIBRATION_GAIN_DENOMINATOR, &generic_u16, 1, NVM_DATA_TYPE_SHORT);
         NVM_stack_error(ERROR_BASE_NVM);
     }
     else {
-        ERROR_stack_add(ERROR_SIGFOX_EP_DL_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR);
+        ERROR_stack_add(ERROR_SIGFOX_EP_DL_UVI_CALIBRATION_GAIN_DENOMINATOR);
         (*configuration_status) = 0;
     }
 }
@@ -587,9 +587,9 @@ static void _SPSWS_compute_final_measurements(void) {
         if (math_status == MATH_SUCCESS) {
 #ifdef SIGFOX_EP_BIDIRECTIONAL
             // Apply calibration.
-            if (spsws_ctx.configuration.uv_index_calibration.gain_denominator != 0) {
-                tmp_s64 = ((((int64_t) generic_s32_1) * ((int64_t) spsws_ctx.configuration.uv_index_calibration.gain_numerator)));
-                tmp_s64 = ((tmp_s64) / ((int64_t) spsws_ctx.configuration.uv_index_calibration.gain_denominator));
+            if (spsws_ctx.configuration.uvi_calibration.gain_denominator != 0) {
+                tmp_s64 = ((((int64_t) generic_s32_1) * ((int64_t) spsws_ctx.configuration.uvi_calibration.gain_numerator)));
+                tmp_s64 = ((tmp_s64) / ((int64_t) spsws_ctx.configuration.uvi_calibration.gain_denominator));
                 generic_s32_1 = (int32_t) tmp_s64;
             }
 #endif
@@ -993,8 +993,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SIGFOX_EP_dl_payload_t dl_payload;
     int16_t dl_rssi = 0;
     RTC_time_t rtc_time;
-    SPSWS_lux_uv_index_calibration_t lux_calibration;
-    SPSWS_lux_uv_index_calibration_t uv_index_calibration;
+    SPSWS_lux_uvi_calibration_t lux_calibration;
+    SPSWS_lux_uvi_calibration_t uvi_calibration;
     uint8_t configuration_status = 0;
     uint8_t calibration_time_hours = 0;
 #endif
@@ -1051,30 +1051,30 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     // Update RTC.
                     _SPSWS_set_date_time(&rtc_time, &configuration_status);
                     break;
-                case SIGFOX_EP_DL_OP_CODE_SET_LUX_UV_INDEX_CALIBRATION:
+                case SIGFOX_EP_DL_OP_CODE_SET_LUX_UVI_CALIBRATION:
                     // Build input structures.
-                    lux_calibration.gain_numerator = dl_payload.set_lux_uv_index_calibration.lux_gain_numerator;
-                    lux_calibration.gain_denominator = dl_payload.set_lux_uv_index_calibration.lux_gain_denominator;
-                    uv_index_calibration.gain_numerator = dl_payload.set_lux_uv_index_calibration.uv_index_gain_numerator;
-                    uv_index_calibration.gain_denominator = dl_payload.set_lux_uv_index_calibration.uv_index_gain_denominator;
+                    lux_calibration.gain_numerator = dl_payload.set_lux_uvi_calibration.lux_gain_numerator;
+                    lux_calibration.gain_denominator = dl_payload.set_lux_uvi_calibration.lux_gain_denominator;
+                    uvi_calibration.gain_numerator = dl_payload.set_lux_uvi_calibration.uvi_gain_numerator;
+                    uvi_calibration.gain_denominator = dl_payload.set_lux_uvi_calibration.uvi_gain_denominator;
                     // Check and store new configuration.
-                    _SPSWS_store_lux_uv_index_calibration(&lux_calibration, &uv_index_calibration, &configuration_status);
+                    _SPSWS_store_lux_uvi_calibration(&lux_calibration, &uvi_calibration, &configuration_status);
                     break;
-                case SIGFOX_EP_DL_OP_CODE_START_LUX_UV_INDEX_CALIBRATION:
+                case SIGFOX_EP_DL_OP_CODE_START_LUX_UVI_CALIBRATION:
                     // Extract time.
-                    calibration_time_hours = dl_payload.start_lux_uv_index_calibration.calibration_time_hours;
+                    calibration_time_hours = dl_payload.start_lux_uvi_calibration.calibration_time_hours;
                     // Check range.
-                    if ((calibration_time_hours >= SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MIN) && (calibration_time_hours <= SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MAX)) {
+                    if ((calibration_time_hours >= SPSWS_LUX_UVI_CALIBRATION_TIME_HOURS_MIN) && (calibration_time_hours <= SPSWS_LUX_UVI_CALIBRATION_TIME_HOURS_MAX)) {
                         // Change RAM configuration to perform light sensor calibration.
                         spsws_ctx.configuration.weather_data_period = SIGFOX_EP_DL_WEATHER_DATA_PERIOD_10_MINUTES;
                         spsws_ctx.configuration.lux_calibration.gain_numerator = 1;
                         spsws_ctx.configuration.lux_calibration.gain_denominator = 1;
-                        spsws_ctx.configuration.uv_index_calibration.gain_numerator = 1;
-                        spsws_ctx.configuration.uv_index_calibration.gain_denominator = 1;
+                        spsws_ctx.configuration.uvi_calibration.gain_numerator = 1;
+                        spsws_ctx.configuration.uvi_calibration.gain_denominator = 1;
                         // Start calibration timer.
-                        spsws_ctx.lux_uv_index_calibration_time_seconds =  (((uint32_t) calibration_time_hours) * MATH_SECONDS_PER_HOUR);
-                        spsws_ctx.lux_uv_index_calibration_start_time_seconds = RTC_get_uptime_seconds();
-                        spsws_ctx.flags.lux_uv_index_calibration_pending = 1;
+                        spsws_ctx.lux_uvi_calibration_time_seconds =  (((uint32_t) calibration_time_hours) * MATH_SECONDS_PER_HOUR);
+                        spsws_ctx.lux_uvi_calibration_start_time_seconds = RTC_get_uptime_seconds();
+                        spsws_ctx.flags.lux_uvi_calibration_pending = 1;
                     }
                     break;
                 default:
@@ -1217,8 +1217,8 @@ static void _SPSWS_init_hw(void) {
     // Load configuration from NVM.
     _SPSWS_load_weather_data_period();
     _SPSWS_store_weather_data_period(spsws_ctx.configuration.weather_data_period, &device_id_lsbyte);
-    _SPSWS_load_lux_uv_index_calibration();
-    _SPSWS_store_lux_uv_index_calibration(&(spsws_ctx.configuration.lux_calibration), &(spsws_ctx.configuration.uv_index_calibration), &device_id_lsbyte);
+    _SPSWS_load_lux_uvi_calibration();
+    _SPSWS_store_lux_uvi_calibration(&(spsws_ctx.configuration.lux_calibration), &(spsws_ctx.configuration.uvi_calibration), &device_id_lsbyte);
 #endif
 }
 
@@ -1429,12 +1429,12 @@ int main(void) {
 #ifdef SIGFOX_EP_BIDIRECTIONAL
             if (spsws_ctx.flags.weather_request_intermediate == 0) {
                 // Check if light calibration is complete.
-                if ((spsws_ctx.flags.lux_uv_index_calibration_pending != 0) && (RTC_get_uptime_seconds() >= (spsws_ctx.lux_uv_index_calibration_start_time_seconds + spsws_ctx.lux_uv_index_calibration_time_seconds))) {
+                if ((spsws_ctx.flags.lux_uvi_calibration_pending != 0) && (RTC_get_uptime_seconds() >= (spsws_ctx.lux_uvi_calibration_start_time_seconds + spsws_ctx.lux_uvi_calibration_time_seconds))) {
                    // Stop calibration
-                   spsws_ctx.flags.lux_uv_index_calibration_pending = 0;
+                   spsws_ctx.flags.lux_uvi_calibration_pending = 0;
                    // Restore configuration.
                    _SPSWS_load_weather_data_period();
-                   _SPSWS_load_lux_uv_index_calibration();
+                   _SPSWS_load_lux_uvi_calibration();
                 }
             }
 #endif

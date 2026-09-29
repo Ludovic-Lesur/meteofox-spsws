@@ -190,8 +190,8 @@ typedef enum {
     SIGFOX_EP_DL_OP_CODE_RESET,
     SIGFOX_EP_DL_OP_CODE_SET_WEATHER_DATA_PERIOD,
     SIGFOX_EP_DL_OP_CODE_SET_DATE_TIME,
-    SIGFOX_EP_DL_OP_CODE_SET_LUX_UV_INDEX_CALIBRATION,
-    SIGFOX_EP_DL_OP_CODE_START_LUX_UV_INDEX_CALIBRATION,
+    SIGFOX_EP_DL_OP_CODE_SET_LUX_UVI_CALIBRATION,
+    SIGFOX_EP_DL_OP_CODE_START_LUX_UVI_CALIBRATION,
     SIGFOX_EP_DL_OP_CODE_LAST
 } SIGFOX_EP_dl_op_code_t;
 #endif
@@ -239,15 +239,15 @@ typedef union {
             struct {
                 unsigned lux_gain_numerator :12;
                 unsigned lux_gain_denominator :12;
-                unsigned uv_index_gain_numerator :12;
-                unsigned uv_index_gain_denominator :12;
+                unsigned uvi_gain_numerator :12;
+                unsigned uvi_gain_denominator :12;
                 unsigned unused :8;
-            } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) set_lux_uv_index_calibration;
+            } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) set_lux_uvi_calibration;
             struct {
                 unsigned calibration_time_hours :8;
                 unsigned unused0 :24;
                 unsigned unused1 :24;
-            } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) start_lux_uv_index_calibration;
+            } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed)) start_lux_uvi_calibration;
         };
     } __attribute__((scalar_storage_order("big-endian"))) __attribute__((packed));
 } SIGFOX_EP_dl_payload_t;
