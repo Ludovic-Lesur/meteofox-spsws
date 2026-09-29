@@ -1386,9 +1386,16 @@ int main(void) {
             application_message.ul_payload = (sfx_u8*) (spsws_ctx.sigfox_ep_ul_payload_weather.frame);
             application_message.ul_payload_size_bytes = SIGFOX_EP_UL_PAYLOAD_SIZE_WEATHER;
 #ifdef SIGFOX_EP_BIDIRECTIONAL
-            application_message.common_parameters.number_of_frames = ((spsws_ctx.flags.weather_request_intermediate == 0) ? 3 : 1);
-            application_message.common_parameters.ul_bit_rate = ((spsws_ctx.flags.weather_request_intermediate == 0) ? SIGFOX_UL_BIT_RATE_100BPS : SIGFOX_UL_BIT_RATE_600BPS);
-            application_message.bidirectional_flag = (spsws_ctx.flags.configuration_request == 0) ? SIGFOX_FALSE : SIGFOX_TRUE;
+            if (spsws_ctx.flags.weather_request_intermediate == 0) {
+                application_message.common_parameters.number_of_frames = 3;
+                application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
+                application_message.bidirectional_flag = (spsws_ctx.flags.configuration_request == 0) ? SIGFOX_FALSE : SIGFOX_TRUE;
+            }
+            else {
+                application_message.common_parameters.number_of_frames = 1;
+                application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_600BPS;
+                application_message.bidirectional_flag = SIGFOX_FALSE;
+            }
 #else
             application_message.common_parameters.ul_bit_rate = SIGFOX_UL_BIT_RATE_100BPS;
 #endif
