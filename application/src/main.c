@@ -70,6 +70,8 @@
 #define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MIN     1
 #define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_DEFAULT 1
 #define SPSWS_LUX_UV_INDEX_CALIBRATION_GAIN_DENOMINATOR_MAX     4095
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MIN           1
+#define SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MAX           168
 // Voltage hysteresis for radio.
 #define SPSWS_RADIO_OFF_STORAGE_VOLTAGE_THRESHOLD_MV            1000
 #define SPSWS_RADIO_ON_STORAGE_VOLTAGE_THRESHOLD_MV             1500
@@ -994,6 +996,7 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
     SPSWS_lux_uv_index_calibration_t lux_calibration;
     SPSWS_lux_uv_index_calibration_t uv_index_calibration;
     uint8_t configuration_status = 0;
+    uint8_t calibration_time_hours = 0;
 #endif
     // Directly exit of the radio is disabled due to low supercap voltage.
     if (spsws_ctx.flags.radio_enabled == 0) goto errors;
@@ -1058,16 +1061,21 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     _SPSWS_store_lux_uv_index_calibration(&lux_calibration, &uv_index_calibration, &configuration_status);
                     break;
                 case SIGFOX_EP_DL_OP_CODE_START_LUX_UV_INDEX_CALIBRATION:
-                    // Change RAM configuration to perform light sensor calibration.
-                    spsws_ctx.configuration.weather_data_period = SIGFOX_EP_DL_WEATHER_DATA_PERIOD_10_MINUTES;
-                    spsws_ctx.configuration.lux_calibration.gain_numerator = 1;
-                    spsws_ctx.configuration.lux_calibration.gain_denominator = 1;
-                    spsws_ctx.configuration.uv_index_calibration.gain_numerator = 1;
-                    spsws_ctx.configuration.uv_index_calibration.gain_denominator = 1;
-                    // Start calibration timer.
-                    spsws_ctx.lux_uv_index_calibration_time_seconds = (uint32_t) (dl_payload.start_lux_uv_index_calibration.calibration_time_hours * MATH_SECONDS_PER_HOUR);
-                    spsws_ctx.lux_uv_index_calibration_start_time_seconds = RTC_get_uptime_seconds();
-                    spsws_ctx.flags.lux_uv_index_calibration_pending = 1;
+                    // Extract time.
+                    calibration_time_hours = dl_payload.start_lux_uv_index_calibration.calibration_time_hours;
+                    // Check range.
+                    if ((calibration_time_hours >= SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MIN) && (calibration_time_hours <= SPSWS_LUX_UV_INDEX_CALIBRATION_TIME_HOURS_MAX)) {
+                        // Change RAM configuration to perform light sensor calibration.
+                        spsws_ctx.configuration.weather_data_period = SIGFOX_EP_DL_WEATHER_DATA_PERIOD_10_MINUTES;
+                        spsws_ctx.configuration.lux_calibration.gain_numerator = 1;
+                        spsws_ctx.configuration.lux_calibration.gain_denominator = 1;
+                        spsws_ctx.configuration.uv_index_calibration.gain_numerator = 1;
+                        spsws_ctx.configuration.uv_index_calibration.gain_denominator = 1;
+                        // Start calibration timer.
+                        spsws_ctx.lux_uv_index_calibration_time_seconds =  (((uint32_t) calibration_time_hours) * MATH_SECONDS_PER_HOUR);
+                        spsws_ctx.lux_uv_index_calibration_start_time_seconds = RTC_get_uptime_seconds();
+                        spsws_ctx.flags.lux_uv_index_calibration_pending = 1;
+                    }
                     break;
                 default:
                     ERROR_stack_add(ERROR_SIGFOX_EP_DL_OP_CODE);
