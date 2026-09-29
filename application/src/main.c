@@ -119,6 +119,7 @@ typedef union {
 typedef union {
     uint16_t all;
     struct {
+        unsigned lux_uv_index_calibration_pending :1;
         unsigned sen15901_process :1;
         unsigned radio_enabled : 1;
         unsigned reset_request : 1;
@@ -209,6 +210,8 @@ typedef struct {
     volatile uint32_t sharp_hour_uptime;
     uint32_t weather_message_count;
     uint32_t weather_last_time_seconds;
+    uint32_t lux_uv_index_calibration_start_time_seconds;
+    uint32_t lux_uv_index_calibration_time_seconds;
 #endif
 } SPSWS_context_t;
 
@@ -1054,6 +1057,18 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                     // Check and store new configuration.
                     _SPSWS_store_lux_uv_index_calibration(&lux_calibration, &uv_index_calibration, &configuration_status);
                     break;
+                case SIGFOX_EP_DL_OP_CODE_START_LUX_UV_INDEX_CALIBRATION:
+                    // Change RAM configuration to perform light sensor calibration.
+                    spsws_ctx.configuration.weather_data_period = SIGFOX_EP_DL_WEATHER_DATA_PERIOD_10_MINUTES;
+                    spsws_ctx.configuration.lux_calibration.gain_numerator = 1;
+                    spsws_ctx.configuration.lux_calibration.gain_denominator = 1;
+                    spsws_ctx.configuration.uv_index_calibration.gain_numerator = 1;
+                    spsws_ctx.configuration.uv_index_calibration.gain_denominator = 1;
+                    // Start calibration timer.
+                    spsws_ctx.lux_uv_index_calibration_time_seconds = (uint32_t) (dl_payload.start_lux_uv_index_calibration.calibration_time_hours * MATH_SECONDS_PER_HOUR);
+                    spsws_ctx.lux_uv_index_calibration_start_time_seconds = RTC_get_uptime_seconds();
+                    spsws_ctx.flags.lux_uv_index_calibration_pending = 1;
+                    break;
                 default:
                     ERROR_stack_add(ERROR_SIGFOX_EP_DL_OP_CODE);
                     break;
@@ -1402,6 +1417,18 @@ int main(void) {
             _SPSWS_send_sigfox_message(&application_message);
 #ifdef SPSWS_SEN15901_EMULATOR
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 0);
+#endif
+#ifdef SIGFOX_EP_BIDIRECTIONAL
+            if (spsws_ctx.flags.weather_request_intermediate == 0) {
+                // Check if light calibration is complete.
+                if ((spsws_ctx.flags.lux_uv_index_calibration_pending != 0) && (RTC_get_uptime_seconds() >= (spsws_ctx.lux_uv_index_calibration_start_time_seconds + spsws_ctx.lux_uv_index_calibration_time_seconds))) {
+                   // Stop calibration
+                   spsws_ctx.flags.lux_uv_index_calibration_pending = 0;
+                   // Restore configuration.
+                   _SPSWS_load_weather_data_period();
+                   _SPSWS_load_lux_uv_index_calibration();
+                }
+            }
 #endif
             // Compute next state.
             spsws_ctx.state = SPSWS_STATE_MONITORING;
