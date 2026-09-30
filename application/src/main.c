@@ -212,8 +212,8 @@ typedef struct {
     volatile uint32_t sharp_hour_uptime;
     uint32_t weather_message_count;
     uint32_t weather_last_time_seconds;
-    uint32_t lux_uvi_calibration_start_time_seconds;
-    uint32_t lux_uvi_calibration_time_seconds;
+    uint8_t lux_uvi_calibration_time_hours;
+    uint8_t lux_uvi_calibration_time_hours_count;
 #endif
 } SPSWS_context_t;
 
@@ -243,6 +243,10 @@ static void _SPSWS_sharp_hour_alarm_callback(void) {
     spsws_ctx.flags.first_sharp_hour_alarm = 1;
     spsws_ctx.flags.sharp_hour_alarm = 1;
     spsws_ctx.sharp_hour_uptime = RTC_get_uptime_seconds();
+    // Increment light calibration time.
+    if (spsws_ctx.flags.lux_uvi_calibration_pending != 0) {
+        spsws_ctx.lux_uvi_calibration_time_hours_count++;
+    }
 #else
     spsws_ctx.flags.weather_request = 1;
     spsws_ctx.flags.monitoring_request = 1;
@@ -1072,8 +1076,8 @@ static void _SPSWS_send_sigfox_message(SIGFOX_EP_API_application_message_t* appl
                         spsws_ctx.configuration.uvi_calibration.gain_numerator = 1;
                         spsws_ctx.configuration.uvi_calibration.gain_denominator = 1;
                         // Start calibration timer.
-                        spsws_ctx.lux_uvi_calibration_time_seconds =  (((uint32_t) calibration_time_hours) * MATH_SECONDS_PER_HOUR);
-                        spsws_ctx.lux_uvi_calibration_start_time_seconds = RTC_get_uptime_seconds();
+                        spsws_ctx.lux_uvi_calibration_time_hours = calibration_time_hours;
+                        spsws_ctx.lux_uvi_calibration_time_hours_count = 0;
                         spsws_ctx.flags.lux_uvi_calibration_pending = 1;
                     }
                     break;
@@ -1427,15 +1431,15 @@ int main(void) {
             GPIO_write(&SPSWS_SEN15901_EMULATOR_SYNCHRO_GPIO, 0);
 #endif
 #ifdef SIGFOX_EP_BIDIRECTIONAL
-            if (spsws_ctx.flags.weather_request_intermediate == 0) {
-                // Check if light calibration is complete.
-                if ((spsws_ctx.flags.lux_uvi_calibration_pending != 0) && (RTC_get_uptime_seconds() >= (spsws_ctx.lux_uvi_calibration_start_time_seconds + spsws_ctx.lux_uvi_calibration_time_seconds))) {
-                   // Stop calibration
-                   spsws_ctx.flags.lux_uvi_calibration_pending = 0;
-                   // Restore configuration.
-                   _SPSWS_load_weather_data_period();
-                   _SPSWS_load_lux_uvi_calibration();
-                }
+            // Check if light calibration is complete.
+            if ((spsws_ctx.flags.lux_uvi_calibration_pending != 0) && (spsws_ctx.lux_uvi_calibration_time_hours_count >= spsws_ctx.lux_uvi_calibration_time_hours)) {
+               // Stop calibration
+               spsws_ctx.flags.lux_uvi_calibration_pending = 0;
+               spsws_ctx.lux_uvi_calibration_time_hours = 0;
+               spsws_ctx.lux_uvi_calibration_time_hours_count = 0;
+               // Restore configuration.
+               _SPSWS_load_weather_data_period();
+               _SPSWS_load_lux_uvi_calibration();
             }
 #endif
             // Compute next state.
